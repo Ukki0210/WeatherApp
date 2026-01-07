@@ -1,0 +1,212 @@
+@page "/dashboard"
+@using WeatherApp.Client.Services
+@using WeatherApp.Shared.Models
+@inject WeatherApiService WeatherApi
+@inject UserProfileApiService UserProfileApi
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Dashboard - Weather App</PageTitle>
+
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1>🌤️ Your Weather Dashboard</h1>
+        <p>Welcome back, @(AuthService.CurrentUserEmail ?? "User")!</p>
+    </div>
+
+    @if (!AuthService.IsAuthenticated)
+    {
+        <div class="auth-required">
+            <h2>🔒 Authentication Required</h2>
+            <p>Please log in to view your dashboard</p>
+            <a href="/login" class="btn btn-primary">Login</a>
+        </div>
+    }
+    else
+    {
+        <div class="dashboard-grid">
+            <!-- Favorite Cities Section -->
+            <div class="dashboard-card">
+                <h2>⭐ Favorite Cities</h2>
+                @if (isLoadingFavorites)
+                {
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading favorites...</p>
+                    </div>
+                }
+                else if (favoriteCities != null && favoriteCities.Any())
+                {
+                    <div class="favorites-grid">
+                        @foreach (var city in favoriteCities)
+                        {
+                            <div class="favorite-item">
+                                <h3>@city</h3>
+                                <button class="btn-small" @onclick="() => ViewWeather(city)">View Weather</button>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="empty-state">No favorite cities yet. Add some from the home page!</p>
+                }
+            </div>
+
+            <!-- Recent Searches Section -->
+            <div class="dashboard-card">
+                <h2>🔍 Recent Searches</h2>
+                @if (isLoadingRecent)
+                {
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading recent searches...</p>
+                    </div>
+                }
+                else if (recentSearches != null && recentSearches.Any())
+                {
+                    <div class="recent-list">
+                        @foreach (var weather in recentSearches.Take(5))
+                        {
+                            <div class="recent-item">
+                                <div class="recent-icon">@GetWeatherEmoji(weather.Icon)</div>
+                                <div class="recent-info">
+                                    <h4>@weather.City, @weather.Country</h4>
+                                    <p>@weather.Timestamp.ToLocalTime().ToString("MMM dd, h:mm tt")</p>
+                                </div>
+                                <div class="recent-temp">@Math.Round(weather.Temperature)°C</div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="empty-state">No recent searches yet.</p>
+                }
+            </div>
+
+            <!-- Quick Stats Section -->
+            <div class="dashboard-card">
+                <h2>📊 Quick Stats</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number">@(favoriteCities?.Count ?? 0)</div>
+                        <div class="stat-label">Favorite Cities</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">@(recentSearches?.Count ?? 0)</div>
+                        <div class="stat-label">Total Searches</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">@lastLoginDays</div>
+                        <div class="stat-label">Days Active</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions Section -->
+            <div class="dashboard-card">
+                <h2>⚡ Quick Actions</h2>
+                <div class="actions-grid">
+                    <a href="/" class="action-btn">
+                        <span class="action-icon">🔍</span>
+                        <span>Search Weather</span>
+                    </a>
+                    <a href="/favorites" class="action-btn">
+                        <span class="action-icon">⭐</span>
+                        <span>Manage Favorites</span>
+                    </a>
+                    <a href="/profile" class="action-btn">
+                        <span class="action-icon">👤</span>
+                        <span>Edit Profile</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+
+
+@code {
+    private List<string>? favoriteCities;
+    private List<WeatherData>? recentSearches;
+    private bool isLoadingFavorites = false;
+    private bool isLoadingRecent = false;
+    private int lastLoginDays = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            return;
+        }
+
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        // Load favorites
+        isLoadingFavorites = true;
+        try
+        {
+            var profile = await UserProfileApi.GetProfileAsync(AuthService.CurrentUserId ?? "");
+            if (profile != null)
+            {
+                favoriteCities = profile.FavoriteCities;
+                lastLoginDays = (DateTime.UtcNow - profile.CreatedAt).Days;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading favorites: {ex.Message}");
+            favoriteCities = new List<string>();
+        }
+        finally
+        {
+            isLoadingFavorites = false;
+        }
+
+        // Load recent searches
+        isLoadingRecent = true;
+        try
+        {
+            recentSearches = await WeatherApi.GetRecentWeatherAsync(10);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading recent searches: {ex.Message}");
+            recentSearches = new List<WeatherData>();
+        }
+        finally
+        {
+            isLoadingRecent = false;
+        }
+    }
+
+    private void ViewWeather(string city)
+    {
+        Navigation.NavigateTo($"/?city={city}");
+    }
+
+    private string GetWeatherEmoji(string iconCode)
+    {
+        return iconCode switch
+        {
+            "01d" => "☀️",
+            "01n" => "🌙",
+            "02d" => "⛅",
+            "02n" => "☁️",
+            "03d" or "03n" => "☁️",
+            "04d" or "04n" => "☁️",
+            "09d" or "09n" => "🌧️",
+            "10d" => "🌦️",
+            "10n" => "🌧️",
+            "11d" or "11n" => "⛈️",
+            "13d" or "13n" => "❄️",
+            "50d" or "50n" => "🌫️",
+            _ => "🌤️"
+        };
+    }
+}

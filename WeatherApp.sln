@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WeatherApp.Client", "WeatherApp.Client\WeatherApp.Client.csproj", "{37B71453-4496-492C-A87F-DD1D2A76B9B6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WeatherApp.Server", "WeatherApp.Server\WeatherApp.Server.csproj", "{FDAD1551-F6EF-4EB1-B091-D5E24DF6177A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WeatherApp.Shared", "WeatherApp.Shared\WeatherApp.Shared.csproj", "{77FDC5C0-02CC-48CA-BBCA-6EA7AAE0C96E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{37B71453-4496-492C-A87F-DD1D2A76B9B6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{37B71453-4496-492C-A87F-DD1D2A76B9B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{37B71453-4496-492C-A87F-DD1D2A76B9B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{37B71453-4496-492C-A87F-DD1D2A76B9B6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FDAD1551-F6EF-4EB1-B091-D5E24DF6177A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FDAD1551-F6EF-4EB1-B091-D5E24DF6177A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FDAD1551-F6EF-4EB1-B091-D5E24DF6177A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FDAD1551-F6EF-4EB1-B091-D5E24DF6177A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77FDC5C0-02CC-48CA-BBCA-6EA7AAE0C96E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77FDC5C0-02CC-48CA-BBCA-6EA7AAE0C96E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77FDC5C0-02CC-48CA-BBCA-6EA7AAE0C96E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77FDC5C0-02CC-48CA-BBCA-6EA7AAE0C96E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

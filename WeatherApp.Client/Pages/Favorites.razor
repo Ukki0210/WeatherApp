@@ -1,0 +1,292 @@
+@page "/favorites"
+@using WeatherApp.Client.Services
+@using WeatherApp.Shared.Models
+@inject WeatherApiService WeatherApi
+@inject UserProfileApiService UserProfileApi
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Favorites - Weather App</PageTitle>
+
+<div class="favorites-container">
+    <div class="favorites-header">
+        <h1>⭐ Favorite Cities</h1>
+        <p>Manage your favorite weather locations</p>
+    </div>
+
+    @if (!AuthService.IsAuthenticated)
+    {
+        <div class="auth-required">
+            <h2>🔒 Authentication Required</h2>
+            <p>Please log in to manage your favorite cities</p>
+            <a href="/login" class="btn btn-primary">Login</a>
+        </div>
+    }
+    else
+    {
+        <!-- Add New Favorite -->
+        <div class="add-favorite-card">
+            <h2>➕ Add New Favorite</h2>
+            <div class="add-favorite-form">
+                <input type="text" 
+                       @bind="newCity" 
+                       @bind:event="oninput"
+                       @onkeypress="HandleKeyPress"
+                       placeholder="Enter city name (e.g., London, Paris)" 
+                       class="city-input" />
+                <button @onclick="AddFavorite" class="btn btn-add" disabled="@isAdding">
+                    @if (isAdding)
+                    {
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <span class="spinner-small"></span>
+                            Adding...
+                        </span>
+                    }
+                    else
+                    {
+                        <span>Add to Favorites</span>
+                    }
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <div class="@(isError ? "alert alert-error" : "alert alert-success")">
+                    @message
+                </div>
+            }
+        </div>
+
+        <!-- Favorites List -->
+        <div class="favorites-section">
+            <h2>Your Favorite Cities (@(favoriteCities?.Count ?? 0))</h2>
+            
+            @if (isLoading)
+            {
+                <div class="loading-container">
+                    <div class="spinner"></div>
+                    <p>Loading your favorites...</p>
+                </div>
+            }
+            else if (favoriteWeatherData != null && favoriteWeatherData.Any())
+            {
+                <div class="favorites-grid">
+                    @foreach (var weather in favoriteWeatherData)
+                    {
+                        <div class="weather-card" @key="weather.City">
+                            <button class="remove-btn" @onclick="() => RemoveFavorite(weather.City)" title="Remove from favorites">
+                                ✕
+                            </button>
+                            
+                            <div class="weather-icon">@GetWeatherEmoji(weather.Icon)</div>
+                            
+                            <h3>@weather.City</h3>
+                            <p class="country">@weather.Country</p>
+                            
+                            <div class="temperature">@Math.Round(weather.Temperature)°C</div>
+                            <p class="description">@weather.Description</p>
+                            
+                            <div class="weather-details">
+                                <div class="detail">
+                                    <span class="detail-icon">💧</span>
+                                    <span class="detail-value">@weather.Humidity%</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="detail-icon">💨</span>
+                                    <span class="detail-value">@Math.Round(weather.WindSpeed, 1) m/s</span>
+                                </div>
+                            </div>
+                            
+                            <button class="btn btn-view" @onclick="() => ViewDetails(weather.City)">
+                                View Details
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+            else if (favoriteCities != null && !favoriteCities.Any())
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">⭐</div>
+                    <h3>No favorites yet</h3>
+                    <p>Add cities above to see their weather here</p>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+
+
+@code {
+    private List<string>? favoriteCities;
+    private List<WeatherData>? favoriteWeatherData = new();
+    private string newCity = "";
+    private bool isLoading = false;
+    private bool isAdding = false;
+    private string? message;
+    private bool isError = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            return;
+        }
+
+        await LoadFavorites();
+    }
+
+    private async Task LoadFavorites()
+    {
+        isLoading = true;
+        try
+        {
+            var profile = await UserProfileApi.GetProfileAsync(AuthService.CurrentUserId ?? "");
+            if (profile != null)
+            {
+                favoriteCities = profile.FavoriteCities;
+                
+                // Load weather for each favorite city
+                favoriteWeatherData = new List<WeatherData>();
+                foreach (var city in favoriteCities)
+                {
+                    var weather = await WeatherApi.GetCurrentWeatherAsync(city, AuthService.CurrentUserId);
+                    if (weather != null)
+                    {
+                        favoriteWeatherData.Add(weather);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading favorites: {ex.Message}");
+            favoriteCities = new List<string>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AddFavorite()
+    {
+        if (string.IsNullOrWhiteSpace(newCity))
+        {
+            message = "Please enter a city name";
+            isError = true;
+            return;
+        }
+
+        isAdding = true;
+        message = null;
+
+        try
+        {
+            // First, verify the city exists by fetching weather
+            var weather = await WeatherApi.GetCurrentWeatherAsync(newCity, AuthService.CurrentUserId);
+            
+            if (weather == null)
+            {
+                message = $"City '{newCity}' not found. Please check the name.";
+                isError = true;
+                return;
+            }
+
+            // Add to favorites
+            var result = await UserProfileApi.AddFavoriteCityAsync(AuthService.CurrentUserId ?? "", weather.City);
+            
+            if (result)
+            {
+                message = $"✅ {weather.City} added to favorites!";
+                isError = false;
+                newCity = "";
+                await LoadFavorites();
+            }
+            else
+            {
+                message = $"{weather.City} is already in your favorites";
+                isError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+            isError = true;
+        }
+        finally
+        {
+            isAdding = false;
+        }
+    }
+
+    private async Task RemoveFavorite(string city)
+    {
+        if (!confirm($"Remove {city} from favorites?"))
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await UserProfileApi.RemoveFavoriteCityAsync(AuthService.CurrentUserId ?? "", city);
+            
+            if (result)
+            {
+                message = $"✅ {city} removed from favorites";
+                isError = false;
+                await LoadFavorites();
+            }
+            else
+            {
+                message = $"Failed to remove {city}";
+                isError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+            isError = true;
+        }
+    }
+
+    private void ViewDetails(string city)
+    {
+        Navigation.NavigateTo($"/?city={city}");
+    }
+
+    private void HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddFavorite();
+        }
+    }
+
+    private bool confirm(string msg)
+    {
+        // In a real app, use a proper confirmation dialog
+        return true;
+    }
+
+    private string GetWeatherEmoji(string iconCode)
+    {
+        return iconCode switch
+        {
+            "01d" => "☀️",
+            "01n" => "🌙",
+            "02d" => "⛅",
+            "02n" => "☁️",
+            "03d" or "03n" => "☁️",
+            "04d" or "04n" => "☁️",
+            "09d" or "09n" => "🌧️",
+            "10d" => "🌦️",
+            "10n" => "🌧️",
+            "11d" or "11n" => "⛈️",
+            "13d" or "13n" => "❄️",
+            "50d" or "50n" => "🌫️",
+            _ => "🌤️"
+        };
+    }
+}

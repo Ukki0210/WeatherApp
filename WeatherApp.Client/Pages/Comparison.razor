@@ -1,0 +1,529 @@
+@page "/comparison"
+@using Microsoft.AspNetCore.Authorization
+@using WeatherApp.Client.Services
+@using WeatherApp.Shared.Models
+@attribute [Authorize]
+@inject IJSRuntime JS
+@inject WeatherApiService WeatherApi
+@inject AuthService AuthService
+
+<PageTitle>Weather Comparison - Weather App</PageTitle>
+
+<div class="comparison-container">
+    <div class="comparison-header">
+        <h1>🌍 Weather Comparison</h1>
+        <p>Compare weather conditions across multiple cities at once</p>
+    </div>
+
+    <!-- Search Section -->
+    <div class="search-section">
+        <div class="search-box">
+            <input type="text"
+                   @bind="searchQuery"
+                   @bind:event="oninput"
+                   @onkeypress="HandleKeyPress"
+                   placeholder="Search for a city to compare..."
+                   class="search-input" />
+            <button @onclick="SearchCity"
+                    disabled="@isSearching"
+                    class="search-btn">
+                @if (isSearching)
+                {
+                    <span>🔍 Searching...</span>
+                }
+                else
+                {
+                    <span>🔍 Search</span>
+                }
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="error-message">
+                ⚠️ @errorMessage
+            </div>
+        }
+
+        @if (cities.Count < 5)
+        {
+            <p class="info-text">💡 You can compare up to 5 cities. Currently: @cities.Count/5</p>
+        }
+    </div>
+
+    <!-- Cities Grid -->
+    @if (cities.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-icon">☁️</div>
+            <h3>No Cities Selected</h3>
+            <p>Search and add cities above to start comparing weather conditions</p>
+        </div>
+    }
+    else
+    {
+        <div class="cities-grid">
+            @foreach (var city in cities)
+            {
+                <div class="city-card">
+                    <div class="city-header @GetConditionClass(city.Description)">
+                        <button @onclick="() => RemoveCity(city.City)" class="remove-btn">✕</button>
+                        <h3>@city.City</h3>
+                        <p>@city.Country</p>
+                        <div class="weather-icon">@GetConditionIcon(city.Icon)</div>
+                        <div class="temperature">@Math.Round(city.Temperature)°C</div>
+                        <p class="description">@city.Description</p>
+                    </div>
+
+                    <div class="city-details">
+                        <div class="detail-row">
+                            <span class="detail-label">🌡️ Feels Like</span>
+                            <span class="detail-value">@Math.Round(city.FeelsLike)°C</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">💧 Humidity</span>
+                            <span class="detail-value">@city.Humidity%</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">💨 Wind Speed</span>
+                            <span class="detail-value">@Math.Round(city.WindSpeed, 1) m/s</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">👁️ Visibility</span>
+                            <span class="detail-value">@(city.Visibility / 1000) km</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">📊 Pressure</span>
+                            <span class="detail-value">@city.Pressure hPa</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Summary Section -->
+        @if (cities.Count > 1)
+        {
+            <div class="summary-section">
+                <h3>📊 Quick Summary</h3>
+                <div class="summary-grid">
+                    <div class="summary-card warmest">
+                        <p class="summary-label">🔥 Warmest City</p>
+                        <p class="summary-value">@GetWarmestCity()</p>
+                    </div>
+                    <div class="summary-card coldest">
+                        <p class="summary-label">❄️ Coldest City</p>
+                        <p class="summary-value">@GetColdestCity()</p>
+                    </div>
+                    <div class="summary-card humid">
+                        <p class="summary-label">💧 Most Humid</p>
+                        <p class="summary-value">@GetMostHumidCity()</p>
+                    </div>
+                    <div class="summary-card windy">
+                        <p class="summary-label">💨 Windiest City</p>
+                        <p class="summary-value">@GetWindiestCity()</p>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .comparison-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+    }
+
+    .comparison-header {
+        text-align: center;
+        color: white;
+        margin-bottom: 2rem;
+    }
+
+    .comparison-header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .search-section {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .search-box {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .search-input {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        border: 2px solid #e2e8f0;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .search-btn {
+        padding: 0.75rem 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .search-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .search-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .error-message {
+        background: #fee;
+        color: #c00;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        border: 1px solid #fcc;
+    }
+
+    .info-text {
+        color: #718096;
+        font-size: 0.875rem;
+    }
+
+    .empty-state {
+        background: white;
+        border-radius: 1rem;
+        padding: 4rem 2rem;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+
+    .cities-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .city-card {
+        background: white;
+        border-radius: 1rem;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        animation: fadeIn 0.5s ease;
+    }
+
+    .city-header {
+        padding: 2rem;
+        color: white;
+        position: relative;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .city-header.clear,
+    .city-header.sunny {
+        background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+    }
+
+    .city-header.clouds,
+    .city-header.cloudy {
+        background: linear-gradient(135deg, #868f96 0%, #596164 100%);
+    }
+
+    .city-header.rain,
+    .city-header.rainy,
+    .city-header.drizzle {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .city-header.snow {
+        background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+        color: #333;
+    }
+
+    .remove-btn {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: rgba(255,255,255,0.2);
+        border: none;
+        color: white;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1.2rem;
+        transition: all 0.3s ease;
+    }
+
+    .remove-btn:hover {
+        background: rgba(255,255,255,0.3);
+        transform: scale(1.1);
+    }
+
+    .weather-icon {
+        font-size: 3rem;
+        margin: 1rem 0;
+    }
+
+    .temperature {
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+
+    .description {
+        text-transform: capitalize;
+        opacity: 0.9;
+    }
+
+    .city-details {
+        padding: 1.5rem;
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .detail-label {
+        color: #718096;
+    }
+
+    .detail-value {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .summary-section {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .summary-section h3 {
+        margin-bottom: 1rem;
+        color: #333;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .summary-card {
+        padding: 1.5rem;
+        border-radius: 0.75rem;
+        text-align: center;
+    }
+
+    .summary-card.warmest {
+        background: #fef3c7;
+    }
+
+    .summary-card.coldest {
+        background: #dbeafe;
+    }
+
+    .summary-card.humid {
+        background: #ddd6fe;
+    }
+
+    .summary-card.windy {
+        background: #d1fae5;
+    }
+
+    .summary-label {
+        color: #4b5563;
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .summary-value {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #1f2937;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .comparison-container {
+            padding: 1rem;
+        }
+
+        .cities-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .search-box {
+            flex-direction: column;
+        }
+    }
+</style>
+
+@code {
+    private string searchQuery = "";
+    private bool isSearching = false;
+    private string? errorMessage;
+    private List<WeatherData> cities = new();
+
+    private async Task SearchCity()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            errorMessage = "Please enter a city name";
+            return;
+        }
+
+        if (cities.Count >= 5)
+        {
+            errorMessage = "You can only compare up to 5 cities at once";
+            return;
+        }
+
+        if (cities.Any(c => c.City.Equals(searchQuery, StringComparison.OrdinalIgnoreCase)))
+        {
+            errorMessage = $"{searchQuery} is already added for comparison";
+            return;
+        }
+
+        isSearching = true;
+        errorMessage = null;
+
+        try
+        {
+            var userId = AuthService.IsAuthenticated ? AuthService.CurrentUserId : null;
+            var weatherData = await WeatherApi.GetCurrentWeatherAsync(searchQuery, userId);
+
+            if (weatherData != null)
+            {
+                cities.Add(weatherData);
+                searchQuery = "";
+            }
+            else
+            {
+                errorMessage = $"Could not find weather data for '{searchQuery}'";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSearching = false;
+        }
+    }
+
+    private void RemoveCity(string cityName)
+    {
+        cities.RemoveAll(c => c.City == cityName);
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchCity();
+        }
+    }
+
+    private string GetConditionClass(string description)
+    {
+        var lower = description.ToLower();
+        if (lower.Contains("clear") || lower.Contains("sun")) return "sunny";
+        if (lower.Contains("cloud")) return "cloudy";
+        if (lower.Contains("rain") || lower.Contains("drizzle")) return "rainy";
+        if (lower.Contains("snow")) return "snow";
+        return "clear";
+    }
+
+    private string GetConditionIcon(string iconCode)
+    {
+        return iconCode switch
+        {
+            "01d" => "☀️",
+            "01n" => "🌙",
+            "02d" => "⛅",
+            "02n" => "☁️",
+            "03d" or "03n" => "☁️",
+            "04d" or "04n" => "☁️",
+            "09d" or "09n" => "🌧️",
+            "10d" => "🌦️",
+            "10n" => "🌧️",
+            "11d" or "11n" => "⛈️",
+            "13d" or "13n" => "❄️",
+            "50d" or "50n" => "🌫️",
+            _ => "🌤️"
+        };
+    }
+
+    private string GetWarmestCity()
+    {
+        var warmest = cities.MaxBy(c => c.Temperature);
+        return warmest != null ? $"{warmest.City} ({Math.Round(warmest.Temperature)}°C)" : "N/A";
+    }
+
+    private string GetColdestCity()
+    {
+        var coldest = cities.MinBy(c => c.Temperature);
+        return coldest != null ? $"{coldest.City} ({Math.Round(coldest.Temperature)}°C)" : "N/A";
+    }
+
+    private string GetMostHumidCity()
+    {
+        var humid = cities.MaxBy(c => c.Humidity);
+        return humid != null ? $"{humid.City} ({humid.Humidity}%)" : "N/A";
+    }
+
+    private string GetWindiestCity()
+    {
+        var windy = cities.MaxBy(c => c.WindSpeed);
+        return windy != null ? $"{windy.City} ({Math.Round(windy.WindSpeed, 1)} m/s)" : "N/A";
+    }
+}

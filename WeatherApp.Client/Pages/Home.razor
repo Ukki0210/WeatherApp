@@ -1,0 +1,1395 @@
+﻿@page "/"
+@using WeatherApp.Client.Services
+@using WeatherApp.Shared.Models
+@using System.Text
+@inject WeatherApiService WeatherApi
+@inject UserProfileApiService UserProfileApi
+@inject AuthService AuthService
+@inject AIWeatherService AIWeatherService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Home - Weather App</PageTitle>
+
+<!-- Video Background Container -->
+@if (!string.IsNullOrEmpty(currentVideoPath))
+{
+    <div class="video-background" @key="videoKey">
+        <video autoplay loop muted playsinline class="background-video">
+            <source src="@currentVideoPath" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <div class="video-overlay"></div>
+    </div>
+}
+
+<div class="home-container">
+    <div class="hero-section">
+        <h1>🌤️ Welcome to Weather App</h1>
+        <p>Get accurate weather information for any city in the world</p>
+    </div>
+
+    <div class="search-section">
+        <div class="search-card">
+            <h2>Search for Weather</h2>
+            <div class="search-form">
+                <input type="text"
+                       @bind="searchCity"
+                       @bind:event="oninput"
+                       @onkeypress="HandleKeyPress"
+                       placeholder="Enter city name (e.g., London, New York)"
+                       class="search-input" />
+                <button @onclick="SearchWeather" class="btn btn-search" disabled="@isLoading">
+                    @if (isLoading)
+                    {
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <span class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></span>
+                            Searching...
+                        </span>
+                    }
+                    else
+                    {
+                        <span>🔍 Search</span>
+                    }
+                </button>
+                <button @onclick="GetLocationWeather" class="btn btn-location" disabled="@isLoadingLocation">
+                    @if (isLoadingLocation)
+                    {
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <span class="spinner" style="width: 20px; height: 20px; border-width: 2px; border-top-color: white;"></span>
+                            Detecting...
+                        </span>
+                    }
+                    else
+                    {
+                        <span>📍 Use My Location</span>
+                    }
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error">
+                    @errorMessage
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (currentWeather != null)
+    {
+        <div class="weather-display">
+            <div class="weather-card">
+                <div class="weather-header">
+                    <h2>@currentWeather.City, @currentWeather.Country</h2>
+                    <p class="weather-time">@currentWeather.Timestamp.ToLocalTime().ToString("MMM dd, yyyy h:mm tt")</p>
+                </div>
+
+                <div class="weather-main">
+                    <div class="weather-icon">
+                        @GetWeatherEmoji(currentWeather.Icon)
+                    </div>
+                    <div class="weather-temp">
+                        <span class="temp-value">@Math.Round(currentWeather.Temperature)°C</span>
+                        <p class="weather-desc">@currentWeather.Description</p>
+                    </div>
+                </div>
+
+                <div class="weather-details">
+                    <div class="detail-card">
+                        <div class="detail-icon">🌡️</div>
+                        <div class="detail-info">
+                            <span class="detail-label">Feels Like</span>
+                            <span class="detail-value">@Math.Round(currentWeather.FeelsLike)°C</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-card">
+                        <div class="detail-icon">💧</div>
+                        <div class="detail-info">
+                            <span class="detail-label">Humidity</span>
+                            <span class="detail-value">@currentWeather.Humidity%</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-card">
+                        <div class="detail-icon">💨</div>
+                        <div class="detail-info">
+                            <span class="detail-label">Wind Speed</span>
+                            <span class="detail-value">@Math.Round(currentWeather.WindSpeed, 1) m/s</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-card">
+                        <div class="detail-icon">🔽</div>
+                        <div class="detail-info">
+                            <span class="detail-label">Pressure</span>
+                            <span class="detail-value">@currentWeather.Pressure hPa</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-card">
+                        <div class="detail-icon">👁️</div>
+                        <div class="detail-info">
+                            <span class="detail-label">Visibility</span>
+                            <span class="detail-value">@(currentWeather.Visibility / 1000) km</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-card">
+                        <div class="detail-icon">☁️</div>
+                        <div class="detail-info">
+                            <span class="detail-label">Clouds</span>
+                            <span class="detail-value">@currentWeather.Clouds%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI INSIGHTS SECTION - ENHANCED -->
+                <div class="ai-insights-section">
+                    <button @onclick="GetAIInsights" class="btn btn-ai" disabled="@isLoadingAI">
+                        @if (isLoadingAI)
+                        {
+                            <span style="display: flex; align-items: center; gap: 8px;">
+                                <span class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></span>
+                                Generating AI Insights...
+                            </span>
+                        }
+                        else
+                        {
+                            <span>🤖 Get AI Weather Insights</span>
+                        }
+                    </button>
+
+                    @if (!string.IsNullOrEmpty(aiInsights))
+                    {
+                        <div class="ai-insights-card-enhanced">
+                            <div class="ai-header-enhanced">
+                                <div class="ai-icon-animated">🤖</div>
+                                <h3>AI Weather Insights</h3>
+                            </div>
+                            <div class="ai-content-enhanced">
+                                @((MarkupString)FormatAIInsights(aiInsights))
+                            </div>
+                            <div class="ai-footer">
+                                <span class="ai-timestamp">⏰ Generated just now</span>
+                                <span class="ai-badge">Powered by Gemini AI</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @if (AuthService.IsAuthenticated)
+                {
+                    <div class="weather-actions">
+                        <button class="btn btn-primary" @onclick="ViewForecast">
+                            📅 5-Day Forecast
+                        </button>
+                        <button class="btn btn-secondary" @onclick="AddToFavorites">
+                            ⭐ Add to Favorites
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="top-cities-section">
+        <h2>Popular Cities</h2>
+        @if (topCities.Any())
+        {
+            <div class="top-cities-grid">
+                @foreach (var city in topCities)
+                {
+                    <div class="city-card" @onclick="() => SearchWeatherByCity(city.Name)">
+                        <div class="city-icon">@GetWeatherEmoji(city.Icon)</div>
+                        <h3>@city.Name</h3>
+                        <p class="city-country">@city.Country</p>
+                        <p class="city-temp">@Math.Round(city.Temperature)°C</p>
+                        <p class="city-desc">@city.Description</p>
+                    </div>
+                }
+            </div>
+        }
+        else if (isLoadingCities)
+        {
+            <div class="loading-container" style="text-align: center; padding: 40px;">
+                <div class="spinner" style="margin: 0 auto;"></div>
+                <p class="loading-text">Loading popular cities...</p>
+            </div>
+        }
+    </div>
+
+    @if (!AuthService.IsAuthenticated)
+    {
+        <div class="cta-section">
+            <h2>Get More Features</h2>
+            <p>Sign up for free to access 5-day forecasts, save favorite cities, and more!</p>
+            <div class="cta-buttons">
+                <a href="/register" class="btn btn-cta">Sign Up Free</a>
+                <a href="/login" class="btn btn-cta-secondary">Login</a>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    /* Video Background Styles */
+    .video-background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -2;
+        overflow: hidden;
+    }
+
+    .background-video {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        min-width: 100%;
+        min-height: 100%;
+        width: auto;
+        height: auto;
+        transform: translate(-50%, -50%);
+        object-fit: cover;
+    }
+
+    .video-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 1;
+    }
+
+    .home-container {
+        position: relative;
+        z-index: 1;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .hero-section {
+        text-align: center;
+        padding: 40px 20px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%);
+        background-size: 200% 200%;
+        color: white;
+        border-radius: 20px;
+        margin-bottom: 30px;
+        animation: gradientShift 15s ease infinite, fadeIn 0.6s ease;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        backdrop-filter: blur(10px);
+    }
+
+    .hero-section h1 {
+        font-size: 2.5em;
+        margin-bottom: 15px;
+        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .hero-section p {
+        font-size: 1.2em;
+        opacity: 0.9;
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .search-section {
+        margin-bottom: 30px;
+    }
+
+    .search-card {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        animation: scaleIn 0.5s ease;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+
+    .search-card:hover {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .search-card h2 {
+        margin-bottom: 20px;
+        color: #333;
+    }
+
+    .search-form {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .search-input {
+        flex: 1;
+        min-width: 250px;
+        padding: 12px 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        font-size: 16px;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+
+    .btn:active::before {
+        width: 300px;
+        height: 300px;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-search {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-search:hover:not(:disabled) {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-location {
+        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        color: white;
+    }
+
+    .btn-location:hover:not(:disabled) {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(76, 175, 80, 0.4);
+    }
+
+    /* Enhanced AI Button Styles */
+    .btn-ai {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        background-size: 200% 200%;
+        color: white;
+        width: 100%;
+        margin-bottom: 20px;
+        font-size: 1.1em;
+        padding: 14px 24px;
+        animation: gradientShift 3s ease infinite;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-ai:hover:not(:disabled) {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 30px rgba(240, 147, 251, 0.5);
+    }
+
+    /* Enhanced AI Insights Card */
+    .ai-insights-section {
+        margin: 20px 0;
+    }
+
+    .ai-insights-card-enhanced {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+        border: 2px solid transparent;
+        border-radius: 20px;
+        padding: 0;
+        margin-top: 15px;
+        animation: fadeIn 0.6s ease, borderGlow 3s ease infinite;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.15);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .ai-insights-card-enhanced::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #667eea);
+        background-size: 200% 100%;
+        animation: gradientSlide 3s linear infinite;
+    }
+
+    .ai-header-enhanced {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px 25px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .ai-header-enhanced::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        animation: rotate 10s linear infinite;
+    }
+
+    .ai-icon-animated {
+        font-size: 2.5em;
+        animation: bounce 2s ease-in-out infinite, pulse 2s ease-in-out infinite;
+        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        z-index: 1;
+    }
+
+    .ai-header-enhanced h3 {
+        margin: 0;
+        font-size: 1.5em;
+        font-weight: 700;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        z-index: 1;
+    }
+
+    .ai-content-enhanced {
+        padding: 25px;
+        color: #2d3748;
+        line-height: 1.8;
+        font-size: 1.05em;
+        background: linear-gradient(to bottom, #ffffff 0%, #f7fafc 100%);
+    }
+
+    /* Section Styling */
+    .insight-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: white;
+        border-radius: 12px;
+        border-left: 4px solid;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+    }
+
+    .insight-section:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .insight-section.overview {
+        border-left-color: #667eea;
+        background: linear-gradient(to right, #f0f4ff 0%, #ffffff 100%);
+    }
+
+    .insight-section.activities {
+        border-left-color: #48bb78;
+        background: linear-gradient(to right, #f0fff4 0%, #ffffff 100%);
+    }
+
+    .insight-section.clothing {
+        border-left-color: #ed8936;
+        background: linear-gradient(to right, #fffaf0 0%, #ffffff 100%);
+    }
+
+    .insight-section.safety {
+        border-left-color: #f56565;
+        background: linear-gradient(to right, #fff5f5 0%, #ffffff 100%);
+    }
+
+    .insight-title {
+        font-weight: 700;
+        font-size: 1.2em;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .insight-title .icon {
+        font-size: 1.3em;
+    }
+
+    .insight-text {
+        color: #4a5568;
+        line-height: 1.7;
+        margin: 0;
+    }
+
+    .ai-footer {
+        padding: 15px 25px;
+        background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .ai-timestamp {
+        color: #718096;
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+
+    .ai-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    .alert {
+        padding: 12px 15px;
+        border-radius: 10px;
+        margin-top: 15px;
+    }
+
+    .alert-error {
+        background: #fee;
+        color: #c00;
+        border: 1px solid #fcc;
+    }
+
+    .weather-display {
+        margin-bottom: 30px;
+    }
+
+    .weather-card {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        animation: fadeIn 0.6s ease;
+        backdrop-filter: blur(10px);
+    }
+
+    .weather-header {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .weather-header h2 {
+        font-size: 2em;
+        color: #333;
+        margin-bottom: 5px;
+    }
+
+    .weather-time {
+        color: #666;
+        font-size: 0.9em;
+    }
+
+    .weather-main {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 30px;
+        margin-bottom: 30px;
+    }
+
+    .weather-icon {
+        font-size: 100px;
+        animation: float 4s ease-in-out infinite, pulse 2s ease-in-out infinite;
+        filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.2));
+    }
+
+    .temp-value {
+        font-size: 4em;
+        font-weight: bold;
+        color: #667eea;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .weather-desc {
+        font-size: 1.2em;
+        color: #666;
+        text-transform: capitalize;
+        margin-top: 10px;
+    }
+
+    .weather-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .detail-card {
+        background: linear-gradient(135deg, rgba(245, 245, 245, 0.95) 0%, rgba(232, 232, 232, 0.95) 100%);
+        padding: 15px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.3s ease;
+        animation: fadeIn 0.5s ease backwards;
+        backdrop-filter: blur(5px);
+    }
+
+    .detail-card:nth-child(1) {
+        animation-delay: 0.1s;
+    }
+
+    .detail-card:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .detail-card:nth-child(3) {
+        animation-delay: 0.3s;
+    }
+
+    .detail-card:nth-child(4) {
+        animation-delay: 0.4s;
+    }
+
+    .detail-card:nth-child(5) {
+        animation-delay: 0.5s;
+    }
+
+    .detail-card:nth-child(6) {
+        animation-delay: 0.6s;
+    }
+
+    .detail-card:hover {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        transform: translateY(-3px) scale(1.05);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .detail-card:hover .detail-label,
+    .detail-card:hover .detail-value {
+        color: white;
+    }
+
+    .detail-icon {
+        font-size: 2em;
+        animation: bounce 2s ease-in-out infinite;
+    }
+
+    .detail-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .detail-label {
+        font-size: 0.85em;
+        color: #666;
+    }
+
+    .detail-value {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .weather-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #4CAF50;
+        color: white;
+    }
+
+    .top-cities-section {
+        margin-bottom: 30px;
+    }
+
+    .top-cities-section h2 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: white;
+        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
+        font-size: 2em;
+    }
+
+    .top-cities-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .city-card {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        position: relative;
+        overflow: hidden;
+        animation: fadeIn 0.5s ease backwards;
+        backdrop-filter: blur(10px);
+    }
+
+    .city-card:nth-child(1) {
+        animation-delay: 0.1s;
+    }
+
+    .city-card:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .city-card:nth-child(3) {
+        animation-delay: 0.3s;
+    }
+
+    .city-card:nth-child(4) {
+        animation-delay: 0.4s;
+    }
+
+    .city-card:nth-child(5) {
+        animation-delay: 0.5s;
+    }
+
+    .city-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+        transition: left 0.5s;
+    }
+
+    .city-card:hover::before {
+        left: 100%;
+    }
+
+    .city-card:hover {
+        transform: translateY(-10px) scale(1.03);
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.3);
+    }
+
+    .city-icon {
+        font-size: 3em;
+        margin-bottom: 10px;
+        animation: float 3s ease-in-out infinite;
+        filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.15));
+    }
+
+    .city-card h3 {
+        margin-bottom: 5px;
+        color: #333;
+    }
+
+    .city-country {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 10px;
+    }
+
+    .city-temp {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #667eea;
+        margin-bottom: 5px;
+    }
+
+    .city-desc {
+        color: #666;
+        text-transform: capitalize;
+    }
+
+    .loading-text {
+        text-align: center;
+        color: white;
+        padding: 40px;
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .cta-section {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+        background-size: 200% 200%;
+        color: white;
+        padding: 40px;
+        border-radius: 20px;
+        text-align: center;
+        animation: gradientShift 15s ease infinite, fadeIn 0.8s ease;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        backdrop-filter: blur(10px);
+    }
+
+    .cta-section h2 {
+        font-size: 2em;
+        margin-bottom: 15px;
+    }
+
+    .cta-section p {
+        font-size: 1.1em;
+        margin-bottom: 25px;
+        opacity: 0.9;
+    }
+
+    .cta-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+    }
+
+    .btn-cta {
+        background: white;
+        color: #667eea;
+        padding: 15px 30px;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+
+    .btn-cta::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(102, 126, 234, 0.1);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+
+    .btn-cta:active::before {
+        width: 300px;
+        height: 300px;
+    }
+
+    .btn-cta:hover {
+        transform: translateY(-3px) scale(1.05);
+        box-shadow: 0 10px 30px rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-cta-secondary {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 2px solid white;
+        padding: 15px 30px;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        border-radius: 10px;
+        font-weight: 600;
+    }
+
+    .btn-cta-secondary:hover {
+        background: white;
+        color: #667eea;
+        transform: translateY(-3px) scale(1.05);
+        box-shadow: 0 10px 30px rgba(255, 255, 255, 0.3);
+    }
+
+    /* Spinner */
+    .spinner {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    /* Animations */
+    @@keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @@keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.05);
+        }
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @@keyframes bounce {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-5px);
+        }
+    }
+
+    @@keyframes gradientShift {
+        0%, 100% {
+            background-position: 0% 50%;
+        }
+
+        50% {
+            background-position: 100% 50%;
+        }
+    }
+
+    @@keyframes scaleIn {
+        from {
+            transform: scale(0.9);
+            opacity: 0;
+        }
+
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    @@keyframes borderGlow {
+        0%, 100% {
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        50% {
+            border-color: rgba(240, 147, 251, 0.5);
+        }
+    }
+
+    @@keyframes gradientSlide {
+        0% {
+            background-position: 0% 50%;
+        }
+
+        100% {
+            background-position: 200% 50%;
+        }
+    }
+
+    @@keyframes rotate {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* Responsive Design */
+    @@media (max-width: 768px) {
+        .video-overlay {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .search-form {
+            flex-direction: column;
+        }
+
+        .weather-main {
+            flex-direction: column;
+        }
+
+        .cta-buttons {
+            flex-direction: column;
+        }
+
+        .ai-content-enhanced {
+            padding: 15px;
+            font-size: 1em;
+        }
+
+        .ai-footer {
+            flex-direction: column;
+            gap: 10px;
+            text-align: center;
+        }
+    }
+</style>
+
+@code {
+    private string searchCity = "";
+    private WeatherData? currentWeather;
+    private List<TopCity> topCities = new();
+    private bool isLoading = false;
+    private bool isLoadingLocation = false;
+    private bool isLoadingCities = false;
+    private bool isLoadingAI = false;
+    private string? errorMessage;
+    private string? aiInsights;
+
+    // Video background variables
+    private string currentVideoPath = "videos/sunny.mp4";
+    private string currentWeatherCondition = "";
+    private int videoKey = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTopCities();
+    }
+
+    private async Task GetAIInsights()
+    {
+        if (currentWeather == null) return;
+
+        isLoadingAI = true;
+        aiInsights = null;
+
+        try
+        {
+            var request = new WeatherInsightRequest
+            {
+                CityName = currentWeather.City,
+                Temperature = currentWeather.Temperature,
+                FeelsLike = currentWeather.FeelsLike,
+                Condition = currentWeather.Description,
+                Humidity = currentWeather.Humidity,
+                WindSpeed = currentWeather.WindSpeed,
+                Visibility = currentWeather.Visibility
+            };
+
+            aiInsights = await AIWeatherService.GetWeatherInsightsAsync(request);
+        }
+        catch (Exception ex)
+        {
+            aiInsights = $"Error generating insights: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingAI = false;
+        }
+    }
+
+    private string FormatAIInsights(string insights)
+    {
+        if (string.IsNullOrEmpty(insights))
+            return "";
+
+        // Split by the section headers
+        var sections = insights.Split(new[] { "**" }, StringSplitOptions.RemoveEmptyEntries);
+
+        var formatted = new StringBuilder();
+
+        for (int i = 0; i < sections.Length; i++)
+        {
+            var section = sections[i].Trim();
+            if (string.IsNullOrEmpty(section))
+                continue;
+
+            // Check if this is a header
+            if (section.Contains("Weather Overview"))
+            {
+                formatted.Append("<div class='insight-section overview'>");
+                formatted.Append("<div class='insight-title'><span class='icon'>🌤️</span>Weather Overview</div>");
+                if (i + 1 < sections.Length)
+                {
+                    formatted.Append($"<p class='insight-text'>{sections[++i].Trim()}</p>");
+                }
+                formatted.Append("</div>");
+            }
+            else if (section.Contains("Activity Recommendations"))
+            {
+                formatted.Append("<div class='insight-section activities'>");
+                formatted.Append("<div class='insight-title'><span class='icon'>⚽</span>Activity Recommendations</div>");
+                if (i + 1 < sections.Length)
+                {
+                    formatted.Append($"<p class='insight-text'>{sections[++i].Trim()}</p>");
+                }
+                formatted.Append("</div>");
+            }
+            else if (section.Contains("Clothing Advice"))
+            {
+                formatted.Append("<div class='insight-section clothing'>");
+                formatted.Append("<div class='insight-title'><span class='icon'>👕</span>Clothing Advice</div>");
+                if (i + 1 < sections.Length)
+                {
+                    formatted.Append($"<p class='insight-text'>{sections[++i].Trim()}</p>");
+                }
+                formatted.Append("</div>");
+            }
+            else if (section.Contains("Health & Safety"))
+            {
+                formatted.Append("<div class='insight-section safety'>");
+                formatted.Append("<div class='insight-title'><span class='icon'>🏥</span>Health & Safety Tips</div>");
+                if (i + 1 < sections.Length)
+                {
+                    formatted.Append($"<p class='insight-text'>{sections[++i].Trim()}</p>");
+                }
+                formatted.Append("</div>");
+            }
+        }
+
+        return formatted.ToString();
+    }
+
+    private async Task SearchWeather()
+    {
+        if (string.IsNullOrWhiteSpace(searchCity))
+        {
+            errorMessage = "Please enter a city name";
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+        aiInsights = null;
+
+        try
+        {
+            var userId = AuthService.IsAuthenticated ? AuthService.CurrentUserId : null;
+            currentWeather = await WeatherApi.GetCurrentWeatherAsync(searchCity, userId);
+
+            if (currentWeather == null)
+            {
+                errorMessage = $"Could not find weather data for '{searchCity}'";
+            }
+            else
+            {
+                currentWeatherCondition = currentWeather.Icon;
+                UpdateVideoBackground();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SearchWeatherByCity(string city)
+    {
+        searchCity = city;
+        await SearchWeather();
+    }
+
+    private async Task GetLocationWeather()
+    {
+        isLoadingLocation = true;
+        errorMessage = null;
+        aiInsights = null;
+
+        try
+        {
+            var position = await JS.InvokeAsync<GeolocationPosition>("getLocation");
+
+            if (position != null)
+            {
+                var userId = AuthService.IsAuthenticated ? AuthService.CurrentUserId : null;
+                currentWeather = await WeatherApi.GetWeatherByCoordinatesAsync(
+                    position.Coords.Latitude,
+                    position.Coords.Longitude,
+                    userId);
+
+                if (currentWeather == null)
+                {
+                    errorMessage = "Could not fetch weather for your location";
+                }
+                else
+                {
+                    currentWeatherCondition = currentWeather.Icon;
+                    UpdateVideoBackground();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Location error: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingLocation = false;
+        }
+    }
+
+    private void UpdateVideoBackground()
+    {
+        var oldPath = currentVideoPath;
+
+        currentVideoPath = currentWeatherCondition switch
+        {
+            "01d" => "videos/sunny.mp4",
+            "01n" => "videos/night-clear.mp4",
+            "02d" or "02n" => "videos/cloudy.mp4",
+            "03d" or "03n" => "videos/cloudy.mp4",
+            "04d" or "04n" => "videos/cloudy.mp4",
+            "09d" or "09n" => "videos/rain.mp4",
+            "10d" or "10n" => "videos/rain.mp4",
+            "11d" or "11n" => "videos/rain.mp4",
+            "13d" or "13n" => "videos/snow.mp4",
+            "50d" or "50n" => "videos/fog.mp4",
+            _ => "videos/sunny.mp4"
+        };
+
+        videoKey++;
+        StateHasChanged();
+    }
+
+    private async Task LoadTopCities()
+    {
+        isLoadingCities = true;
+        try
+        {
+            topCities = await WeatherApi.GetTopCitiesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading top cities: {ex.Message}");
+        }
+        finally
+        {
+            isLoadingCities = false;
+        }
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchWeather();
+        }
+    }
+
+    private async Task ViewForecast()
+    {
+        if (currentWeather == null)
+        {
+            errorMessage = "Please search for weather first";
+            return;
+        }
+
+        Navigation.NavigateTo($"/forecast/{currentWeather.City}");
+    }
+
+    private async Task AddToFavorites()
+    {
+        if (currentWeather == null)
+        {
+            errorMessage = "Please search for weather first";
+            return;
+        }
+
+        if (!AuthService.IsAuthenticated)
+        {
+            errorMessage = "Please login to add favorites";
+            await Task.Delay(2000);
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        try
+        {
+            var result = await UserProfileApi.AddFavoriteCityAsync(
+                AuthService.CurrentUserId ?? "",
+                currentWeather.City
+            );
+
+            if (result)
+            {
+                await JS.InvokeVoidAsync("alert", $"✅ {currentWeather.City} added to favorites!");
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", $"❌ {currentWeather.City} is already in your favorites");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding to favorites: {ex.Message}";
+        }
+    }
+
+    private string GetWeatherEmoji(string iconCode)
+    {
+        return iconCode switch
+        {
+            "01d" => "☀️",
+            "01n" => "🌙",
+            "02d" => "⛅",
+            "02n" => "☁️",
+            "03d" or "03n" => "☁️",
+            "04d" or "04n" => "☁️",
+            "09d" or "09n" => "🌧️",
+            "10d" => "🌦️",
+            "10n" => "🌧️",
+            "11d" or "11n" => "⛈️",
+            "13d" or "13n" => "❄️",
+            "50d" or "50n" => "🌫️",
+            _ => "🌤️"
+        };
+    }
+
+    public class GeolocationPosition
+    {
+        public GeolocationCoordinates Coords { get; set; } = new();
+    }
+
+    public class GeolocationCoordinates
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+    }
+}

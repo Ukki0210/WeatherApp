@@ -1,0 +1,288 @@
+@page "/register"
+@using WeatherApp.Client.Services
+@using WeatherApp.Shared.Models
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Sign Up - Weather App</PageTitle>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>🌤️ Weather App</h1>
+            <h2>Create Account</h2>
+            <p>Join us to get personalized weather insights</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-error">
+                @errorMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success">
+                @successMessage
+            </div>
+        }
+
+        <EditForm Model="@registerRequest" OnValidSubmit="@HandleRegister">
+            <DataAnnotationsValidator />
+
+            <div class="form-group">
+                <label for="displayName">Display Name</label>
+                <InputText id="displayName" class="form-control" @bind-Value="registerRequest.DisplayName" 
+                          placeholder="Your name" />
+                <ValidationMessage For="@(() => registerRequest.DisplayName)" />
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <InputText id="email" class="form-control" @bind-Value="registerRequest.Email" 
+                          placeholder="you@example.com" />
+                <ValidationMessage For="@(() => registerRequest.Email)" />
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <InputText id="password" type="password" class="form-control" 
+                          @bind-Value="registerRequest.Password" placeholder="At least 6 characters" />
+                <ValidationMessage For="@(() => registerRequest.Password)" />
+                <small class="form-text">Must be at least 6 characters long</small>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password</label>
+                <InputText id="confirmPassword" type="password" class="form-control" 
+                          @bind-Value="confirmPassword" placeholder="Re-enter password" />
+                @if (!string.IsNullOrEmpty(confirmPassword) && confirmPassword != registerRequest.Password)
+                {
+                    <small class="text-danger">Passwords do not match</small>
+                }
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span>Creating account...</span>
+                }
+                else
+                {
+                    <span>Sign Up</span>
+                }
+            </button>
+        </EditForm>
+
+        <div class="auth-footer">
+            <p>Already have an account? <a href="/login">Sign in here</a></p>
+            <p><a href="/">Continue as guest</a></p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+    }
+
+    .auth-card {
+        background: white;
+        border-radius: 20px;
+        padding: 40px;
+        max-width: 450px;
+        width: 100%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .auth-header h1 {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+        color: #667eea;
+    }
+
+    .auth-header h2 {
+        font-size: 1.8em;
+        margin-bottom: 10px;
+        color: #333;
+    }
+
+    .auth-header p {
+        color: #666;
+        font-size: 0.95em;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 600;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        font-size: 16px;
+        transition: border-color 0.3s;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .form-text {
+        display: block;
+        margin-top: 5px;
+        color: #666;
+        font-size: 0.85em;
+    }
+
+    .text-danger {
+        color: #c00;
+        font-size: 0.85em;
+        margin-top: 5px;
+        display: block;
+    }
+
+    .btn {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-block {
+        width: 100%;
+    }
+
+    .alert {
+        padding: 12px 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+
+    .alert-error {
+        background: #fee;
+        color: #c00;
+        border: 1px solid #fcc;
+    }
+
+    .alert-success {
+        background: #efe;
+        color: #0a0;
+        border: 1px solid #cfc;
+    }
+
+    .auth-footer {
+        margin-top: 30px;
+        text-align: center;
+        color: #666;
+    }
+
+    .auth-footer p {
+        margin: 10px 0;
+    }
+
+    .auth-footer a {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .auth-footer a:hover {
+        text-decoration: underline;
+    }
+
+    .validation-message {
+        color: #c00;
+        font-size: 0.85em;
+        margin-top: 5px;
+    }
+</style>
+
+@code {
+    private RegisterRequest registerRequest = new();
+    private string confirmPassword = string.Empty;
+    private bool isLoading = false;
+    private string? errorMessage;
+    private string? successMessage;
+
+    private async Task HandleRegister()
+    {
+        if (registerRequest.Password != confirmPassword)
+        {
+            errorMessage = "Passwords do not match";
+            return;
+        }
+
+        if (registerRequest.Password.Length < 6)
+        {
+            errorMessage = "Password must be at least 6 characters";
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await AuthService.RegisterAsync(registerRequest);
+
+            if (result.Success)
+            {
+                successMessage = "Account created successfully! Redirecting...";
+                await Task.Delay(1500);
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = result.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

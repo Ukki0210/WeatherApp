@@ -1,0 +1,66 @@
+﻿@inherits LayoutComponentBase
+@using WeatherApp.Client.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="page">
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <a href="/" class="brand-link">
+                    <span class="brand-icon">🌤️</span>
+                    <span class="brand-text">Weather App</span>
+                </a>
+            </div>
+
+            <div class="navbar-menu">
+                <a href="/" class="nav-link">Home</a>
+
+                @if (AuthService.IsAuthenticated)
+                {
+                    <a href="/dashboard" class="nav-link">Dashboard</a>
+                    <a href="/comparison" class="nav-link">Compare</a>
+                    <a href="/favorites" class="nav-link">Favorites</a>
+                    <a href="/profile" class="nav-link">Profile</a>
+                    <button class="btn btn-logout" @onclick="HandleLogout">
+                        Logout
+                    </button>
+                }
+                else
+                {
+                    <a href="/login" class="btn btn-login">Login</a>
+                    <a href="/register" class="btn btn-register">Sign Up</a>
+                }
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        @Body
+    </main>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <p>&copy; 2024 Weather App. Built with Blazor & .NET 8</p>
+            <p>Data provided by OpenWeatherMap</p>
+        </div>
+    </footer>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        AuthService.OnAuthStateChanged += StateHasChanged;
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/");
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= StateHasChanged;
+    }
+}

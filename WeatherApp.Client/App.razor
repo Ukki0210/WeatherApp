@@ -1,0 +1,54 @@
+﻿<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div class="not-found">
+                <h1>404 - Page Not Found</h1>
+                <p>Sorry, we couldn't find the page you're looking for.</p>
+                <a href="/" class="btn-home">Go Home</a>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>
+
+<style>
+    .not-found {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 60vh;
+        text-align: center;
+        padding: 40px;
+    }
+
+    .not-found h1 {
+        font-size: 3em;
+        color: #667eea;
+        margin-bottom: 20px;
+    }
+
+    .not-found p {
+        font-size: 1.2em;
+        color: #666;
+        margin-bottom: 30px;
+    }
+
+    .btn-home {
+        padding: 15px 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-decoration: none;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: transform 0.3s;
+    }
+
+    .btn-home:hover {
+        transform: translateY(-2px);
+    }
+</style>

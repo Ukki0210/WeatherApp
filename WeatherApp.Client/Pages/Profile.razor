@@ -1,0 +1,289 @@
+@page "/profile"
+@using WeatherApp.Client.Services
+@using WeatherApp.Shared.Models
+@inject UserProfileApiService UserProfileApi
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Profile - Weather App</PageTitle>
+
+<div class="profile-container">
+    <div class="profile-header">
+        <h1>👤 My Profile</h1>
+        <p>Manage your account settings and preferences</p>
+    </div>
+
+    @if (!AuthService.IsAuthenticated)
+    {
+        <div class="auth-required">
+            <h2>🔒 Authentication Required</h2>
+            <p>Please log in to view your profile</p>
+            <a href="/login" class="btn btn-primary">Login</a>
+        </div>
+    }
+    else
+    {
+        @if (isLoading)
+        {
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <p>Loading your profile...</p>
+            </div>
+        }
+        else
+        {
+            <div class="profile-grid">
+                <!-- Account Information -->
+                <div class="profile-card">
+                    <h2>📧 Account Information</h2>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Display Name</label>
+                            <input type="text" @bind="displayName" class="form-input" />
+                        </div>
+                        <div class="info-item">
+                            <label>Email Address</label>
+                            <input type="email" value="@AuthService.CurrentUserEmail" class="form-input" disabled />
+                            <small>Email cannot be changed</small>
+                        </div>
+                        <div class="info-item">
+                            <label>Member Since</label>
+                            <input type="text" value="@createdAt.ToString("MMMM dd, yyyy")" class="form-input" disabled />
+                        </div>
+                        <div class="info-item">
+                            <label>Last Login</label>
+                            <input type="text" value="@lastLogin.ToString("MMMM dd, yyyy h:mm tt")" class="form-input" disabled />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preferences -->
+                <div class="profile-card">
+                    <h2>⚙️ Preferences</h2>
+                    <div class="preferences-grid">
+                        <div class="preference-item">
+                            <div class="preference-label">
+                                <span class="preference-icon">🌡️</span>
+                                <div>
+                                    <h4>Temperature Unit</h4>
+                                    <p>Choose your preferred temperature unit</p>
+                                </div>
+                            </div>
+                            <select @bind="temperatureUnit" class="form-select">
+                                <option value="celsius">Celsius (°C)</option>
+                                <option value="fahrenheit">Fahrenheit (°F)</option>
+                            </select>
+                        </div>
+
+                        <div class="preference-item">
+                            <div class="preference-label">
+                                <span class="preference-icon">🌙</span>
+                                <div>
+                                    <h4>Dark Mode</h4>
+                                    <p>Toggle dark mode theme</p>
+                                </div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" @bind="darkMode" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="preference-item">
+                            <div class="preference-label">
+                                <span class="preference-icon">🏠</span>
+                                <div>
+                                    <h4>Default City</h4>
+                                    <p>City to show on homepage</p>
+                                </div>
+                            </div>
+                            <input type="text" @bind="defaultCity" class="form-input" placeholder="e.g., London" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics -->
+                <div class="profile-card">
+                    <h2>📊 Your Statistics</h2>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-icon">⭐</div>
+                            <div class="stat-number">@favoritesCount</div>
+                            <div class="stat-label">Favorite Cities</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-icon">🔍</div>
+                            <div class="stat-number">@searchesCount</div>
+                            <div class="stat-label">Total Searches</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-icon">📅</div>
+                            <div class="stat-number">@daysActive</div>
+                            <div class="stat-label">Days Active</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="profile-card">
+                    <h2>🔧 Actions</h2>
+                    <div class="actions-grid">
+                        <button @onclick="SaveProfile" class="btn btn-save" disabled="@isSaving">
+                            @if (isSaving)
+                            {
+                                <span style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="spinner-small"></span>
+                                    Saving...
+                                </span>
+                            }
+                            else
+                            {
+                                <span>💾 Save Changes</span>
+                            }
+                        </button>
+                        <button @onclick="ResetProfile" class="btn btn-reset">
+                            🔄 Reset to Defaults
+                        </button>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(message))
+                    {
+                        <div class="@(isError ? "alert alert-error" : "alert alert-success")">
+                            @message
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+
+
+@code {
+    private UserProfile? userProfile;
+    private string displayName = "";
+    private string defaultCity = "";
+    private string temperatureUnit = "celsius";
+    private bool darkMode = false;
+    private DateTime createdAt = DateTime.UtcNow;
+    private DateTime lastLogin = DateTime.UtcNow;
+    private int favoritesCount = 0;
+    private int searchesCount = 0;
+    private int daysActive = 0;
+    private bool isLoading = false;
+    private bool isSaving = false;
+    private string? message;
+    private bool isError = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            return;
+        }
+
+        await LoadProfile();
+    }
+
+    private async Task LoadProfile()
+    {
+        isLoading = true;
+        try
+        {
+            userProfile = await UserProfileApi.GetProfileAsync(AuthService.CurrentUserId ?? "");
+            
+            if (userProfile != null)
+            {
+                displayName = userProfile.DisplayName;
+                defaultCity = userProfile.DefaultCity;
+                temperatureUnit = userProfile.TemperatureUnit;
+                darkMode = userProfile.DarkMode;
+                createdAt = userProfile.CreatedAt;
+                lastLogin = userProfile.LastLogin;
+                favoritesCount = userProfile.FavoriteCities.Count;
+                daysActive = (DateTime.UtcNow - userProfile.CreatedAt).Days;
+            }
+            else
+            {
+                // Create new profile if doesn't exist
+                userProfile = new UserProfile
+                {
+                    SupabaseUserId = AuthService.CurrentUserId ?? "",
+                    Email = AuthService.CurrentUserEmail ?? "",
+                    DisplayName = "User",
+                    CreatedAt = DateTime.UtcNow,
+                    LastLogin = DateTime.UtcNow
+                };
+                await UserProfileApi.CreateOrUpdateProfileAsync(userProfile);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading profile: {ex.Message}");
+            message = "Error loading profile. Please try again.";
+            isError = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        isSaving = true;
+        message = null;
+
+        try
+        {
+            var result = await UserProfileApi.UpdatePreferencesAsync(
+                AuthService.CurrentUserId ?? "",
+                darkMode,
+                temperatureUnit,
+                defaultCity
+            );
+
+            if (result)
+            {
+                // Update display name if changed
+                if (userProfile != null)
+                {
+                    userProfile.DisplayName = displayName;
+                    userProfile.DefaultCity = defaultCity;
+                    userProfile.DarkMode = darkMode;
+                    userProfile.TemperatureUnit = temperatureUnit;
+                    await UserProfileApi.CreateOrUpdateProfileAsync(userProfile);
+                }
+
+                message = "✅ Profile saved successfully!";
+                isError = false;
+            }
+            else
+            {
+                message = "Failed to save profile. Please try again.";
+                isError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+            isError = true;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ResetProfile()
+    {
+        displayName = userProfile?.DisplayName ?? "User";
+        defaultCity = "";
+        temperatureUnit = "celsius";
+        darkMode = false;
+        
+        message = "Settings reset to defaults. Click 'Save Changes' to apply.";
+        isError = false;
+    }
+}

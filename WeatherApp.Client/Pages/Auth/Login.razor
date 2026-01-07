@@ -1,0 +1,243 @@
+@page "/login"
+@using WeatherApp.Client.Services
+@using WeatherApp.Shared.Models
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Login - Weather App</PageTitle>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>🌤️ Weather App</h1>
+            <h2>Welcome Back!</h2>
+            <p>Sign in to access personalized weather features</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-error">
+                @errorMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success">
+                @successMessage
+            </div>
+        }
+
+        <EditForm Model="@loginRequest" OnValidSubmit="@HandleLogin">
+            <DataAnnotationsValidator />
+
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <InputText id="email" class="form-control" @bind-Value="loginRequest.Email" 
+                          placeholder="you@example.com" />
+                <ValidationMessage For="@(() => loginRequest.Email)" />
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <InputText id="password" type="password" class="form-control" 
+                          @bind-Value="loginRequest.Password" placeholder="Enter your password" />
+                <ValidationMessage For="@(() => loginRequest.Password)" />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span>Signing in...</span>
+                }
+                else
+                {
+                    <span>Sign In</span>
+                }
+            </button>
+        </EditForm>
+
+        <div class="auth-footer">
+            <p>Don't have an account? <a href="/register">Sign up here</a></p>
+            <p><a href="/">Continue as guest</a></p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+    }
+
+    .auth-card {
+        background: white;
+        border-radius: 20px;
+        padding: 40px;
+        max-width: 450px;
+        width: 100%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .auth-header h1 {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+        color: #667eea;
+    }
+
+    .auth-header h2 {
+        font-size: 1.8em;
+        margin-bottom: 10px;
+        color: #333;
+    }
+
+    .auth-header p {
+        color: #666;
+        font-size: 0.95em;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 600;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        font-size: 16px;
+        transition: border-color 0.3s;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .btn {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-block {
+        width: 100%;
+    }
+
+    .alert {
+        padding: 12px 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+
+    .alert-error {
+        background: #fee;
+        color: #c00;
+        border: 1px solid #fcc;
+    }
+
+    .alert-success {
+        background: #efe;
+        color: #0a0;
+        border: 1px solid #cfc;
+    }
+
+    .auth-footer {
+        margin-top: 30px;
+        text-align: center;
+        color: #666;
+    }
+
+    .auth-footer p {
+        margin: 10px 0;
+    }
+
+    .auth-footer a {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .auth-footer a:hover {
+        text-decoration: underline;
+    }
+
+    .validation-message {
+        color: #c00;
+        font-size: 0.85em;
+        margin-top: 5px;
+    }
+</style>
+
+@code {
+    private LoginRequest loginRequest = new();
+    private bool isLoading = false;
+    private string? errorMessage;
+    private string? successMessage;
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await AuthService.LoginAsync(loginRequest);
+
+            if (result.Success)
+            {
+                successMessage = "Login successful! Redirecting...";
+                await Task.Delay(1000);
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = result.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

@@ -1,0 +1,223 @@
+@page "/forecast/{city}"
+@using WeatherApp.Client.Services
+@using WeatherApp.Shared.Models
+@inject WeatherApiService WeatherApi
+@inject NavigationManager Navigation
+
+<PageTitle>5-Day Forecast - @City</PageTitle>
+
+<div class="forecast-page">
+    <!-- Hero Header -->
+    <div class="forecast-hero">
+        <div class="hero-background"></div>
+        <div class="hero-content">
+            <button class="btn-back" @onclick="GoBack">
+                <span class="back-arrow">←</span>
+                <span>Back to Search</span>
+            </button>
+            <div class="hero-title">
+                <div class="forecast-icon-large">📅</div>
+                <h1>5-Day Weather Forecast</h1>
+                <h2>@City</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="forecast-container">
+        @if (isLoading)
+        {
+            <div class="loading-state">
+                <div class="loading-animation">
+                    <div class="spinner-large"></div>
+                    <div class="loading-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+                <p class="loading-text">Fetching forecast data...</p>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="error-state">
+                <div class="error-icon">⚠️</div>
+                <h3>Oops! Something went wrong</h3>
+                <p>@errorMessage</p>
+                <button class="btn btn-retry" @onclick="LoadForecast">
+                    <span>🔄</span>
+                    <span>Try Again</span>
+                </button>
+            </div>
+        }
+        else if (forecastData != null)
+        {
+            <!-- Summary Card -->
+            <div class="summary-card">
+                <div class="summary-icon">📍</div>
+                <div class="summary-content">
+                    <h3>@forecastData.City, @forecastData.Country</h3>
+                    <p>@forecastData.Forecasts.Count forecast data points over 5 days</p>
+                </div>
+                <div class="summary-badge">
+                    <span class="badge-text">Updated</span>
+                    <span class="badge-time">@DateTime.Now.ToString("h:mm tt")</span>
+                </div>
+            </div>
+
+            <!-- Forecast Cards -->
+            <div class="forecast-timeline">
+                @foreach (var group in GroupForecastsByDay())
+                {
+                    var dayForecasts = group.Value;
+                    var avgTemp = dayForecasts.Average(f => f.Temperature);
+                    var maxTemp = dayForecasts.Max(f => f.Temperature);
+                    var minTemp = dayForecasts.Min(f => f.Temperature);
+                    
+                    <div class="day-section">
+                        <!-- Day Header -->
+                        <div class="day-header-card">
+                            <div class="day-date">
+                                <div class="day-name">@group.Key.ToString("dddd")</div>
+                                <div class="day-month">@group.Key.ToString("MMMM dd, yyyy")</div>
+                            </div>
+                            <div class="day-summary">
+                                <div class="temp-range">
+                                    <span class="temp-high">↑ @Math.Round(maxTemp)°</span>
+                                    <span class="temp-divider">/</span>
+                                    <span class="temp-low">↓ @Math.Round(minTemp)°</span>
+                                </div>
+                                <div class="avg-temp">Avg: @Math.Round(avgTemp)°C</div>
+                            </div>
+                        </div>
+
+                        <!-- Hourly Forecast Cards -->
+                        <div class="hourly-scroll">
+                            <div class="hourly-grid">
+                                @foreach (var forecast in dayForecasts)
+                                {
+                                    <div class="forecast-card">
+                                        <div class="card-time">
+                                            @forecast.DateTime.ToLocalTime().ToString("h:mm")
+                                            <span class="time-period">@forecast.DateTime.ToLocalTime().ToString("tt")</span>
+                                        </div>
+                                        
+                                        <div class="card-icon-wrapper">
+                                            <div class="card-icon">@GetWeatherEmoji(forecast.Icon)</div>
+                                            <div class="icon-glow"></div>
+                                        </div>
+                                        
+                                        <div class="card-temp">
+                                            <span class="temp-value">@Math.Round(forecast.Temperature)</span>
+                                            <span class="temp-unit">°C</span>
+                                        </div>
+                                        
+                                        <div class="card-description">@forecast.Description</div>
+                                        
+                                        <div class="card-metrics">
+                                            <div class="metric">
+                                                <span class="metric-icon">💧</span>
+                                                <span class="metric-value">@forecast.Humidity%</span>
+                                            </div>
+                                            <div class="metric">
+                                                <span class="metric-icon">💨</span>
+                                                <span class="metric-value">@Math.Round(forecast.WindSpeed, 1)</span>
+                                            </div>
+                                        </div>
+
+                                        @if (forecast.RainVolume > 0)
+                                        {
+                                            <div class="rain-indicator">
+                                                <span class="rain-icon">🌧️</span>
+                                                <span class="rain-amount">@forecast.RainVolume mm</span>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string City { get; set; } = "";
+
+    private ForecastData? forecastData;
+    private bool isLoading = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadForecast();
+    }
+
+    private async Task LoadForecast()
+    {
+        if (string.IsNullOrWhiteSpace(City))
+        {
+            errorMessage = "City name is required";
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            forecastData = await WeatherApi.GetForecastAsync(City);
+
+            if (forecastData == null)
+            {
+                errorMessage = $"Could not load forecast for {City}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private Dictionary<DateTime, List<ForecastItem>> GroupForecastsByDay()
+    {
+        if (forecastData == null || forecastData.Forecasts == null)
+            return new Dictionary<DateTime, List<ForecastItem>>();
+
+        return forecastData.Forecasts
+            .GroupBy(f => f.DateTime.Date)
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    private string GetWeatherEmoji(string iconCode)
+    {
+        return iconCode switch
+        {
+            "01d" => "☀️",
+            "01n" => "🌙",
+            "02d" => "⛅",
+            "02n" => "☁️",
+            "03d" or "03n" => "☁️",
+            "04d" or "04n" => "☁️",
+            "09d" or "09n" => "🌧️",
+            "10d" => "🌦️",
+            "10n" => "🌧️",
+            "11d" or "11n" => "⛈️",
+            "13d" or "13n" => "❄️",
+            "50d" or "50n" => "🌫️",
+            _ => "🌤️"
+        };
+    }
+}
