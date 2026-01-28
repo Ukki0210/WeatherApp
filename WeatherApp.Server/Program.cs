@@ -8,6 +8,9 @@ using Supabase;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ✅ ADD THIS LINE - Force load environment variables
+builder.Configuration.AddEnvironmentVariables();
+
 // Add Controllers and Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -22,14 +25,18 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 // Register Background Service
 builder.Services.AddHostedService<FavoriteWeatherMonitorService>();
 
-// MongoDB Configuration
+// ✅ UPDATED MongoDB Configuration - Read from environment first
 var mongoConnectionString =
-    builder.Configuration["MongoDB__ConnectionString"]
+    Environment.GetEnvironmentVariable("MONGODB__CONNECTIONSTRING")
+    ?? builder.Configuration["MONGODB__CONNECTIONSTRING"]
+    ?? builder.Configuration["MongoDB__ConnectionString"]
     ?? builder.Configuration.GetConnectionString("MongoDB")
     ?? throw new Exception("MongoDB connection string not found");
 
 var mongoDatabaseName =
-    builder.Configuration["MongoDB__DatabaseName"]
+    Environment.GetEnvironmentVariable("MONGODB__DATABASENAME")
+    ?? builder.Configuration["MONGODB__DATABASENAME"]
+    ?? builder.Configuration["MongoDB__DatabaseName"]
     ?? builder.Configuration["MongoDatabase:DatabaseName"] 
     ?? "WeatherAppDB";
 
@@ -48,12 +55,18 @@ builder.Services.AddSingleton<IMongoDatabase>(sp =>
     return client.GetDatabase(mongoDatabaseName);
 });
 
-// Supabase Configuration
-var supabaseUrl = builder.Configuration["Supabase__Url"]
+// ✅ UPDATED Supabase Configuration
+var supabaseUrl = 
+    Environment.GetEnvironmentVariable("SUPABASE__URL")
+    ?? builder.Configuration["SUPABASE__URL"]
+    ?? builder.Configuration["Supabase__Url"]
     ?? builder.Configuration["Supabase:Url"] 
     ?? throw new Exception("Supabase Url missing");
 
-var supabaseKey = builder.Configuration["Supabase__AnonKey"]
+var supabaseKey = 
+    Environment.GetEnvironmentVariable("SUPABASE__KEY")
+    ?? builder.Configuration["SUPABASE__KEY"]
+    ?? builder.Configuration["Supabase__AnonKey"]
     ?? builder.Configuration["Supabase:AnonKey"] 
     ?? throw new Exception("Supabase AnonKey missing");
 
@@ -73,16 +86,25 @@ builder.Services.AddScoped<WeatherService>();
 builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<SupabaseAuthService>();
 
-// JWT Authentication
-var jwtSecretKey = builder.Configuration["Jwt__SecretKey"]
+// ✅ UPDATED JWT Authentication
+var jwtSecretKey = 
+    Environment.GetEnvironmentVariable("JWT__SECRETKEY")
+    ?? builder.Configuration["JWT__SECRETKEY"]
+    ?? builder.Configuration["Jwt__SecretKey"]
     ?? builder.Configuration["Jwt:SecretKey"] 
     ?? "your-default-secret-key-min-32-chars-long";
 
-var jwtIssuer = builder.Configuration["Jwt__Issuer"]
+var jwtIssuer = 
+    Environment.GetEnvironmentVariable("JWT__ISSUER")
+    ?? builder.Configuration["JWT__ISSUER"]
+    ?? builder.Configuration["Jwt__Issuer"]
     ?? builder.Configuration["Jwt:Issuer"] 
     ?? "WeatherApp";
 
-var jwtAudience = builder.Configuration["Jwt__Audience"]
+var jwtAudience = 
+    Environment.GetEnvironmentVariable("JWT__AUDIENCE")
+    ?? builder.Configuration["JWT__AUDIENCE"]
+    ?? builder.Configuration["Jwt__Audience"]
     ?? builder.Configuration["Jwt:Audience"] 
     ?? "WeatherAppUsers";
 
@@ -115,7 +137,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Configure Middleware Pipeline
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
@@ -129,7 +151,7 @@ app.UseAuthorization();
 // Map Controllers
 app.MapControllers();
 
-// ROOT ENDPOINT - IMPORTANT!
+// ROOT ENDPOINT
 app.MapGet("/", () => Results.Ok(new 
 { 
     message = "Weather App API is running!",
@@ -151,11 +173,13 @@ Console.WriteLine("===========================================");
 // Test MongoDB Connection
 try
 {
+    Console.WriteLine("Testing MongoDB Atlas connection...");
+    Console.WriteLine($"Connection String: {mongoConnectionString}");
     await MongoConnectionTest.TestConnection(mongoConnectionString);
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"⚠️ MongoDB test failed: {ex.Message}");
+    Console.WriteLine($"❌ MongoDB test failed: {ex.Message}");
 }
 
 app.Run();
