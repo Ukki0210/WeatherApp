@@ -8,6 +8,19 @@ using Supabase;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
+// ✅ DEBUG: Print ALL environment variables
+Console.WriteLine("==================== ENVIRONMENT VARIABLES ====================");
+Console.WriteLine($"MONGODB__CONNECTIONSTRING: {Environment.GetEnvironmentVariable("MONGODB__CONNECTIONSTRING")}");
+Console.WriteLine($"MONGODB__DATABASENAME: {Environment.GetEnvironmentVariable("MONGODB__DATABASENAME")}");
+Console.WriteLine($"SUPABASE__URL: {Environment.GetEnvironmentVariable("SUPABASE__URL")}");
+Console.WriteLine($"SUPABASE__KEY: {Environment.GetEnvironmentVariable("SUPABASE__KEY")}");
+Console.WriteLine($"OPENWEATHERMAP__APIKEY: {Environment.GetEnvironmentVariable("OPENWEATHERMAP__APIKEY")}");
+Console.WriteLine("================================================================");
+
+// ... rest of your code
+
+
 // ✅ ADD THIS LINE - Force load environment variables
 builder.Configuration.AddEnvironmentVariables();
 
