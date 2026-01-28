@@ -8,20 +8,6 @@ using Supabase;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
-// ✅ DEBUG: Print ALL environment variables
-Console.WriteLine("==================== ENVIRONMENT VARIABLES ====================");
-Console.WriteLine($"MONGODB__CONNECTIONSTRING: {Environment.GetEnvironmentVariable("MONGODB__CONNECTIONSTRING")}");
-Console.WriteLine($"MONGODB__DATABASENAME: {Environment.GetEnvironmentVariable("MONGODB__DATABASENAME")}");
-Console.WriteLine($"SUPABASE__URL: {Environment.GetEnvironmentVariable("SUPABASE__URL")}");
-Console.WriteLine($"SUPABASE__KEY: {Environment.GetEnvironmentVariable("SUPABASE__KEY")}");
-Console.WriteLine($"OPENWEATHERMAP__APIKEY: {Environment.GetEnvironmentVariable("OPENWEATHERMAP__APIKEY")}");
-Console.WriteLine("================================================================");
-
-// ... rest of your code
-
-
-// ✅ ADD THIS LINE - Force load environment variables
 builder.Configuration.AddEnvironmentVariables();
 
 // Add Controllers and Swagger
@@ -38,20 +24,20 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 // Register Background Service
 builder.Services.AddHostedService<FavoriteWeatherMonitorService>();
 
-// ✅ UPDATED MongoDB Configuration - Read from environment first
+// ✅ FIXED MongoDB Configuration - Match Render variable names
 var mongoConnectionString =
-    Environment.GetEnvironmentVariable("MONGODB__CONNECTIONSTRING")
-    ?? builder.Configuration["MONGODB__CONNECTIONSTRING"]
+    Environment.GetEnvironmentVariable("MongoDB__ConnectionString")
     ?? builder.Configuration["MongoDB__ConnectionString"]
     ?? builder.Configuration.GetConnectionString("MongoDB")
     ?? throw new Exception("MongoDB connection string not found");
 
 var mongoDatabaseName =
-    Environment.GetEnvironmentVariable("MONGODB__DATABASENAME")
-    ?? builder.Configuration["MONGODB__DATABASENAME"]
+    Environment.GetEnvironmentVariable("MongoDB__DatabaseName")
     ?? builder.Configuration["MongoDB__DatabaseName"]
-    ?? builder.Configuration["MongoDatabase:DatabaseName"] 
     ?? "WeatherAppDB";
+
+Console.WriteLine($"DEBUG - MongoDB Connection: {(mongoConnectionString.StartsWith("mongodb+srv") ? "Atlas" : "Local")}");
+Console.WriteLine($"DEBUG - MongoDB Database: {mongoDatabaseName}");
 
 builder.Services.AddSingleton<IMongoClient>(_ =>
 {
@@ -68,17 +54,15 @@ builder.Services.AddSingleton<IMongoDatabase>(sp =>
     return client.GetDatabase(mongoDatabaseName);
 });
 
-// ✅ UPDATED Supabase Configuration
+// ✅ FIXED Supabase Configuration
 var supabaseUrl = 
-    Environment.GetEnvironmentVariable("SUPABASE__URL")
-    ?? builder.Configuration["SUPABASE__URL"]
+    Environment.GetEnvironmentVariable("Supabase__Url")
     ?? builder.Configuration["Supabase__Url"]
     ?? builder.Configuration["Supabase:Url"] 
     ?? throw new Exception("Supabase Url missing");
 
 var supabaseKey = 
-    Environment.GetEnvironmentVariable("SUPABASE__KEY")
-    ?? builder.Configuration["SUPABASE__KEY"]
+    Environment.GetEnvironmentVariable("Supabase__AnonKey")
     ?? builder.Configuration["Supabase__AnonKey"]
     ?? builder.Configuration["Supabase:AnonKey"] 
     ?? throw new Exception("Supabase AnonKey missing");
@@ -99,24 +83,21 @@ builder.Services.AddScoped<WeatherService>();
 builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<SupabaseAuthService>();
 
-// ✅ UPDATED JWT Authentication
+// ✅ FIXED JWT Authentication
 var jwtSecretKey = 
-    Environment.GetEnvironmentVariable("JWT__SECRETKEY")
-    ?? builder.Configuration["JWT__SECRETKEY"]
+    Environment.GetEnvironmentVariable("Jwt__SecretKey")
     ?? builder.Configuration["Jwt__SecretKey"]
     ?? builder.Configuration["Jwt:SecretKey"] 
     ?? "your-default-secret-key-min-32-chars-long";
 
 var jwtIssuer = 
-    Environment.GetEnvironmentVariable("JWT__ISSUER")
-    ?? builder.Configuration["JWT__ISSUER"]
+    Environment.GetEnvironmentVariable("Jwt__Issuer")
     ?? builder.Configuration["Jwt__Issuer"]
     ?? builder.Configuration["Jwt:Issuer"] 
     ?? "WeatherApp";
 
 var jwtAudience = 
-    Environment.GetEnvironmentVariable("JWT__AUDIENCE")
-    ?? builder.Configuration["JWT__AUDIENCE"]
+    Environment.GetEnvironmentVariable("Jwt__Audience")
     ?? builder.Configuration["Jwt__Audience"]
     ?? builder.Configuration["Jwt:Audience"] 
     ?? "WeatherAppUsers";
