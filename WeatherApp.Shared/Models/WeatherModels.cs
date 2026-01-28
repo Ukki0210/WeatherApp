@@ -3,7 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-
+using WeatherApp.Shared.Models;
 namespace WeatherApp.Shared.Models
 {
     // Current Weather Data

@@ -1,211 +1,164 @@
-using MongoDB.Driver;
-using WeatherApp.Shared.Models;
-using Newtonsoft.Json.Linq;
+using System.Net.Http;
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace WeatherApp.Server.Services
 {
     public class WeatherService
     {
-        private readonly IMongoCollection<WeatherData> _weatherCollection;
-        private readonly IMongoCollection<ForecastData> _forecastCollection;
         private readonly HttpClient _httpClient;
-        private readonly IConfiguration _configuration;
         private readonly string _apiKey;
-        private readonly string _baseUrl;
+        private readonly ILogger<WeatherService> _logger;
 
-        public WeatherService(
-            IMongoDatabase database,
-            HttpClient httpClient,
-            IConfiguration configuration)
+        public WeatherService(HttpClient httpClient, IConfiguration configuration, ILogger<WeatherService> logger)
         {
-            _weatherCollection = database.GetCollection<WeatherData>(
-                configuration["MongoDatabase:WeatherCollection"] ?? "weatherData");
-            _forecastCollection = database.GetCollection<ForecastData>(
-                configuration["MongoDatabase:ForecastCollection"] ?? "forecasts");
             _httpClient = httpClient;
-            _configuration = configuration;
-            _apiKey = configuration["OpenWeatherMap:ApiKey"] ?? "";
-            _baseUrl = configuration["OpenWeatherMap:BaseUrl"] ?? "";
+            _apiKey = configuration["OpenWeatherMap__ApiKey"] 
+                ?? configuration["OpenWeatherMap:ApiKey"]
+                ?? throw new Exception("OpenWeatherMap API key not configured");
+            _logger = logger;
         }
 
-        // Fetch current weather by city
-        public async Task<WeatherData?> FetchCurrentWeatherAsync(string city, string? userId = null)
+        public async Task<object?> GetCurrentWeatherAsync(string city)
         {
             try
             {
-                var url = $"{_baseUrl}/weather?q={city}&appid={_apiKey}&units=metric";
-                var response = await _httpClient.GetStringAsync(url);
-                var json = JObject.Parse(response);
-
-                var weatherData = new WeatherData
+                var url = $"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={_apiKey}&units=metric";
+                
+                var response = await _httpClient.GetAsync(url);
+                
+                if (!response.IsSuccessStatusCode)
                 {
-                    City = json["name"]?.ToString() ?? city,
-                    Country = json["sys"]?["country"]?.ToString() ?? "",
-                    Latitude = json["coord"]?["lat"]?.ToObject<double>() ?? 0,
-                    Longitude = json["coord"]?["lon"]?.ToObject<double>() ?? 0,
-                    Temperature = json["main"]?["temp"]?.ToObject<double>() ?? 0,
-                    FeelsLike = json["main"]?["feels_like"]?.ToObject<double>() ?? 0,
-                    TempMin = json["main"]?["temp_min"]?.ToObject<double>() ?? 0,
-                    TempMax = json["main"]?["temp_max"]?.ToObject<double>() ?? 0,
-                    Description = json["weather"]?[0]?["description"]?.ToString() ?? "",
-                    Humidity = json["main"]?["humidity"]?.ToObject<int>() ?? 0,
-                    WindSpeed = json["wind"]?["speed"]?.ToObject<double>() ?? 0,
-                    Pressure = json["main"]?["pressure"]?.ToObject<int>() ?? 0,
-                    Visibility = json["visibility"]?.ToObject<int>() ?? 0,
-                    Clouds = json["clouds"]?["all"]?.ToObject<int>() ?? 0,
-                    Icon = json["weather"]?[0]?["icon"]?.ToString() ?? "",
-                    Sunrise = DateTimeOffset.FromUnixTimeSeconds(
-                        json["sys"]?["sunrise"]?.ToObject<long>() ?? 0).DateTime,
-                    Sunset = DateTimeOffset.FromUnixTimeSeconds(
-                        json["sys"]?["sunset"]?.ToObject<long>() ?? 0).DateTime,
-                    Timestamp = DateTime.UtcNow,
-                    UserId = userId
-                };
+                    _logger.LogWarning("OpenWeatherMap API returned {StatusCode} for city {City}", response.StatusCode, city);
+                    return null;
+                }
 
-                await _weatherCollection.InsertOneAsync(weatherData);
-                return weatherData;
+                var content = await response.Content.ReadAsStringAsync();
+                var weatherData = JsonSerializer.Deserialize<JsonElement>(content);
+
+                return new
+                {
+                    city = weatherData.GetProperty("name").GetString(),
+                    country = weatherData.GetProperty("sys").GetProperty("country").GetString(),
+                    temperature = weatherData.GetProperty("main").GetProperty("temp").GetDouble(),
+                    feelsLike = weatherData.GetProperty("main").GetProperty("feels_like").GetDouble(),
+                    description = weatherData.GetProperty("weather")[0].GetProperty("description").GetString(),
+                    humidity = weatherData.GetProperty("main").GetProperty("humidity").GetInt32(),
+                    pressure = weatherData.GetProperty("main").GetProperty("pressure").GetInt32(),
+                    windSpeed = weatherData.GetProperty("wind").GetProperty("speed").GetDouble(),
+                    clouds = weatherData.GetProperty("clouds").GetProperty("all").GetInt32(),
+                    visibility = weatherData.TryGetProperty("visibility", out var vis) ? vis.GetInt32() : 10000,
+                    timestamp = DateTimeOffset.FromUnixTimeSeconds(weatherData.GetProperty("dt").GetInt64()).DateTime
+                };
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching weather: {ex.Message}");
-                return null;
+                _logger.LogError(ex, "Error fetching weather for {City}", city);
+                throw;
             }
         }
 
-        // Fetch weather by coordinates
-        public async Task<WeatherData?> FetchWeatherByCoordinatesAsync(
-            double lat, double lon, string? userId = null)
+        public async Task<WeatherData?> FetchCurrentWeatherAsync(string city, string userId)
         {
             try
             {
-                var url = $"{_baseUrl}/weather?lat={lat}&lon={lon}&appid={_apiKey}&units=metric";
-                var response = await _httpClient.GetStringAsync(url);
-                var json = JObject.Parse(response);
-
-                var weatherData = new WeatherData
+                var url = $"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={_apiKey}&units=metric";
+                
+                var response = await _httpClient.GetAsync(url);
+                
+                if (!response.IsSuccessStatusCode)
                 {
-                    City = json["name"]?.ToString() ?? "Unknown",
-                    Country = json["sys"]?["country"]?.ToString() ?? "",
-                    Latitude = lat,
-                    Longitude = lon,
-                    Temperature = json["main"]?["temp"]?.ToObject<double>() ?? 0,
-                    FeelsLike = json["main"]?["feels_like"]?.ToObject<double>() ?? 0,
-                    TempMin = json["main"]?["temp_min"]?.ToObject<double>() ?? 0,
-                    TempMax = json["main"]?["temp_max"]?.ToObject<double>() ?? 0,
-                    Description = json["weather"]?[0]?["description"]?.ToString() ?? "",
-                    Humidity = json["main"]?["humidity"]?.ToObject<int>() ?? 0,
-                    WindSpeed = json["wind"]?["speed"]?.ToObject<double>() ?? 0,
-                    Pressure = json["main"]?["pressure"]?.ToObject<int>() ?? 0,
-                    Visibility = json["visibility"]?.ToObject<int>() ?? 0,
-                    Clouds = json["clouds"]?["all"]?.ToObject<int>() ?? 0,
-                    Icon = json["weather"]?[0]?["icon"]?.ToString() ?? "",
-                    Sunrise = DateTimeOffset.FromUnixTimeSeconds(
-                        json["sys"]?["sunrise"]?.ToObject<long>() ?? 0).DateTime,
-                    Sunset = DateTimeOffset.FromUnixTimeSeconds(
-                        json["sys"]?["sunset"]?.ToObject<long>() ?? 0).DateTime,
-                    Timestamp = DateTime.UtcNow,
-                    UserId = userId
-                };
+                    _logger.LogWarning("OpenWeatherMap API returned {StatusCode} for city {City}", response.StatusCode, city);
+                    return null;
+                }
 
-                await _weatherCollection.InsertOneAsync(weatherData);
-                return weatherData;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching weather: {ex.Message}");
-                return null;
-            }
-        }
+                var content = await response.Content.ReadAsStringAsync();
+                var weatherData = JsonSerializer.Deserialize<JsonElement>(content);
 
-        // Fetch 5-day forecast
-        public async Task<ForecastData?> FetchForecastAsync(string city)
-        {
-            try
-            {
-                var url = $"{_baseUrl}/forecast?q={city}&appid={_apiKey}&units=metric";
-                var response = await _httpClient.GetStringAsync(url);
-                var json = JObject.Parse(response);
-
-                var forecastData = new ForecastData
+                return new WeatherData
                 {
-                    City = json["city"]?["name"]?.ToString() ?? city,
-                    Country = json["city"]?["country"]?.ToString() ?? "",
+                    City = weatherData.GetProperty("name").GetString() ?? city,
+                    Temperature = weatherData.GetProperty("main").GetProperty("temp").GetDouble(),
+                    FeelsLike = weatherData.GetProperty("main").GetProperty("feels_like").GetDouble(),
+                    Description = weatherData.GetProperty("weather")[0].GetProperty("description").GetString() ?? "",
+                    Humidity = weatherData.GetProperty("main").GetProperty("humidity").GetInt32(),
+                    WindSpeed = weatherData.GetProperty("wind").GetProperty("speed").GetDouble(),
+                    Visibility = weatherData.TryGetProperty("visibility", out var vis) ? vis.GetInt32() : 10000, // ✅ ADDED
                     Timestamp = DateTime.UtcNow
                 };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching weather for {City}, User: {UserId}", city, userId);
+                return null;
+            }
+        }
 
-                var list = json["list"] as JArray;
-                if (list != null)
+        public async Task<object?> GetForecastAsync(string city)
+        {
+            try
+            {
+                var url = $"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={_apiKey}&units=metric";
+                
+                var response = await _httpClient.GetAsync(url);
+                
+                if (!response.IsSuccessStatusCode)
                 {
-                    foreach (var item in list)
+                    _logger.LogWarning("OpenWeatherMap forecast API returned {StatusCode} for city {City}", response.StatusCode, city);
+                    return null;
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                var forecastData = JsonSerializer.Deserialize<JsonElement>(content);
+
+                var forecastList = new List<object>();
+                
+                if (forecastData.TryGetProperty("list", out var list))
+                {
+                    foreach (var item in list.EnumerateArray())
                     {
-                        var forecast = new ForecastItem
+                        forecastList.Add(new
                         {
-                            DateTime = DateTimeOffset.FromUnixTimeSeconds(
-                                item["dt"]?.ToObject<long>() ?? 0).DateTime,
-                            Temperature = item["main"]?["temp"]?.ToObject<double>() ?? 0,
-                            FeelsLike = item["main"]?["feels_like"]?.ToObject<double>() ?? 0,
-                            TempMin = item["main"]?["temp_min"]?.ToObject<double>() ?? 0,
-                            TempMax = item["main"]?["temp_max"]?.ToObject<double>() ?? 0,
-                            Description = item["weather"]?[0]?["description"]?.ToString() ?? "",
-                            Humidity = item["main"]?["humidity"]?.ToObject<int>() ?? 0,
-                            WindSpeed = item["wind"]?["speed"]?.ToObject<double>() ?? 0,
-                            Clouds = item["clouds"]?["all"]?.ToObject<int>() ?? 0,
-                            Icon = item["weather"]?[0]?["icon"]?.ToString() ?? "",
-                            RainVolume = item["rain"]?["3h"]?.ToObject<double>() ?? 0
-                        };
-                        forecastData.Forecasts.Add(forecast);
+                            dateTime = DateTimeOffset.FromUnixTimeSeconds(item.GetProperty("dt").GetInt64()).DateTime,
+                            temperature = item.GetProperty("main").GetProperty("temp").GetDouble(),
+                            feelsLike = item.GetProperty("main").GetProperty("feels_like").GetDouble(),
+                            tempMin = item.GetProperty("main").GetProperty("temp_min").GetDouble(),
+                            tempMax = item.GetProperty("main").GetProperty("temp_max").GetDouble(),
+                            description = item.GetProperty("weather")[0].GetProperty("description").GetString(),
+                            humidity = item.GetProperty("main").GetProperty("humidity").GetInt32(),
+                            windSpeed = item.GetProperty("wind").GetProperty("speed").GetDouble(),
+                            clouds = item.GetProperty("clouds").GetProperty("all").GetInt32(),
+                            pop = item.TryGetProperty("pop", out var popValue) ? popValue.GetDouble() * 100 : 0
+                        });
                     }
                 }
 
-                await _forecastCollection.InsertOneAsync(forecastData);
-                return forecastData;
+                return new
+                {
+                    city = forecastData.GetProperty("city").GetProperty("name").GetString(),
+                    country = forecastData.GetProperty("city").GetProperty("country").GetString(),
+                    forecasts = forecastList
+                };
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching forecast: {ex.Message}");
-                return null;
+                _logger.LogError(ex, "Error fetching forecast for {City}", city);
+                throw;
             }
         }
+    }
 
-        // Get top 5 cities weather
-        public async Task<List<TopCity>> GetTopCitiesWeatherAsync()
-        {
-            var topCities = new List<TopCity>();
-            var cities = _configuration.GetSection("TopCities").Get<List<string>>() ?? new List<string>();
-
-            foreach (var cityCountry in cities)
-            {
-                try
-                {
-                    var url = $"{_baseUrl}/weather?q={cityCountry}&appid={_apiKey}&units=metric";
-                    var response = await _httpClient.GetStringAsync(url);
-                    var json = JObject.Parse(response);
-
-                    topCities.Add(new TopCity
-                    {
-                        Name = json["name"]?.ToString() ?? "",
-                        Country = json["sys"]?["country"]?.ToString() ?? "",
-                        Temperature = json["main"]?["temp"]?.ToObject<double>() ?? 0,
-                        Description = json["weather"]?[0]?["description"]?.ToString() ?? "",
-                        Icon = json["weather"]?[0]?["icon"]?.ToString() ?? ""
-                    });
-                }
-                catch
-                {
-                    continue;
-                }
-            }
-
-            return topCities;
-        }
-
-        // Get recent weather data
-        public async Task<List<WeatherData>> GetRecentWeatherAsync(int limit = 50)
-        {
-            return await _weatherCollection.Find(_ => true)
-                .SortByDescending(w => w.Timestamp)
-                .Limit(limit)
-                .ToListAsync();
-        }
+    // ✅ UPDATED - Added Visibility property
+    public class WeatherData
+    {
+        public string City { get; set; } = string.Empty;
+        public double Temperature { get; set; }
+        public double FeelsLike { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public int Humidity { get; set; }
+        public double WindSpeed { get; set; }
+        public int Visibility { get; set; } = 10000; // ✅ ADDED - Visibility in meters, default 10km
+        public DateTime Timestamp { get; set; }
     }
 }
