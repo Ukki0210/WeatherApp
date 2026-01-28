@@ -175,5 +175,16 @@ catch (Exception ex)
 {
     Console.WriteLine($"❌ MongoDB test failed: {ex.Message}");
 }
+// Debug: List all registered endpoints
+Console.WriteLine("==================== REGISTERED ENDPOINTS ====================");
+var endpoints = app.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints;
+foreach (var endpoint in endpoints)
+{
+    Console.WriteLine($"  {endpoint.DisplayName}");
+}
+Console.WriteLine("==============================================================");
+
+app.Run();
+
 
 app.Run();

@@ -1,11 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using WeatherApp.Server.Services;
-using WeatherApp.Shared.Models;
 
 namespace WeatherApp.Server.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/[controller]")]  // This makes it /api/weather
     public class WeatherController : ControllerBase
     {
         private readonly WeatherService _weatherService;
@@ -74,7 +73,10 @@ namespace WeatherApp.Server.Controllers
         [HttpGet("test")]
         public IActionResult Test()
         {
-            return Ok(new { message = "Weather Controller working!", timestamp = DateTime.UtcNow });
+            return Ok(new { 
+                message = "Weather Controller working!", 
+                timestamp = DateTime.UtcNow 
+            });
         }
     }
 }
