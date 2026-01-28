@@ -19,10 +19,6 @@ builder.Services.AddSingleton<IAlertService, AlertService>();
 // Register Email Service
 builder.Services.AddScoped<IEmailService, EmailService>();
 
-// Register AI Weather Service - COMMENTED OUT TEMPORARILY
-// builder.Services.AddHttpClient<AIWeatherService>();
-// builder.Services.AddScoped<AIWeatherService>();
-
 // Register Background Service
 builder.Services.AddHostedService<FavoriteWeatherMonitorService>();
 
@@ -123,28 +119,31 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-    
 }
-
-// REMOVED for Render - Render handles HTTPS
-// app.UseHttpsRedirection();
-
-// Serve Blazor WebAssembly files
-
 
 app.UseRouting();
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Map Controllers
 app.MapControllers();
 
-// Fallback to index.html for Blazor routing
+// ROOT ENDPOINT - IMPORTANT!
+app.MapGet("/", () => Results.Ok(new 
+{ 
+    message = "Weather App API is running!",
+    version = "1.0",
+    status = "healthy",
+    timestamp = DateTime.UtcNow
+}));
 
+// Health check endpoint
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 // Startup Logs
 Console.WriteLine("===========================================");
-Console.WriteLine($"Weather App Started - {app.Environment.EnvironmentName}");
+Console.WriteLine($"Weather App API - {app.Environment.EnvironmentName}");
 Console.WriteLine($"MongoDB: {mongoDatabaseName}");
 Console.WriteLine($"Supabase: {supabaseUrl}");
 Console.WriteLine("===========================================");
