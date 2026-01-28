@@ -943,3 +943,129 @@
   transform: translateZ(0);
   backface-visibility: hidden;
 }
+/* ============================================
+   DARK MODE GLOBAL STYLES
+   ============================================ */
+
+body.dark-mode {
+    background: #1a1a2e !important;
+    color: #eee !important;
+}
+
+/* Cards and Sections */
+body.dark-mode .weather-card,
+body.dark-mode .search-card,
+body.dark-mode .city-card,
+body.dark-mode .forecast-card,
+body.dark-mode .profile-card {
+    background: rgba(22, 33, 62, 0.95) !important;
+    color: #eee !important;
+}
+
+/* Hero and CTA Sections */
+body.dark-mode .hero-section,
+body.dark-mode .cta-section {
+    background: linear-gradient(135deg, rgba(15, 52, 96, 0.95) 0%, rgba(42, 48, 78, 0.95) 100%) !important;
+}
+
+/* Headings */
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4 {
+    color: #7f8ff4 !important;
+}
+
+/* Text Elements */
+body.dark-mode p,
+body.dark-mode .weather-time,
+body.dark-mode .city-desc,
+body.dark-mode .detail-label,
+body.dark-mode .city-country,
+body.dark-mode .loading-text,
+body.dark-mode .weather-desc {
+    color: #bbb !important;
+}
+
+/* Inputs */
+body.dark-mode .search-input,
+body.dark-mode input[type="text"],
+body.dark-mode input[type="email"],
+body.dark-mode input[type="password"],
+body.dark-mode select,
+body.dark-mode .form-input,
+body.dark-mode .form-select {
+    background: #0f3460 !important;
+    border-color: #1a5490 !important;
+    color: #eee !important;
+}
+
+body.dark-mode input::placeholder {
+    color: #999 !important;
+}
+
+/* Detail Cards */
+body.dark-mode .detail-card {
+    background: linear-gradient(135deg, rgba(15, 52, 96, 0.95) 0%, rgba(42, 48, 78, 0.95) 100%) !important;
+}
+
+body.dark-mode .detail-card:hover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+body.dark-mode .detail-value,
+body.dark-mode .city-temp,
+body.dark-mode .temp-value {
+    color: #7f8ff4 !important;
+}
+
+body.dark-mode .detail-card:hover .detail-label,
+body.dark-mode .detail-card:hover .detail-value {
+    color: white !important;
+}
+
+/* Navigation */
+body.dark-mode .nav-link {
+    color: #eee !important;
+}
+
+body.dark-mode .nav-link:hover {
+    color: #7f8ff4 !important;
+}
+
+/* Top Cities */
+body.dark-mode .top-cities-section h2 {
+    color: #7f8ff4 !important;
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* AI Insights Dark Mode */
+body.dark-mode .ai-insights-card-enhanced {
+    background: linear-gradient(135deg, #16213e 0%, #0f3460 100%) !important;
+}
+
+body.dark-mode .ai-content-enhanced {
+    background: linear-gradient(to bottom, #16213e 0%, #0f3460 100%) !important;
+    color: #ccc !important;
+}
+
+body.dark-mode .insight-section {
+    background: rgba(15, 52, 96, 0.5) !important;
+}
+
+body.dark-mode .insight-title {
+    color: #eee !important;
+}
+
+body.dark-mode .insight-text {
+    color: #ccc !important;
+}
+
+body.dark-mode .ai-footer {
+    background: linear-gradient(135deg, #0f3460 0%, #0a2540 100%) !important;
+}
+
+/* Video Overlay */
+body.dark-mode .video-overlay {
+    background: rgba(0, 0, 0, 0.6) !important;
+}

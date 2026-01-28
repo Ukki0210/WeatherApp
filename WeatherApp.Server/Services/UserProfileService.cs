@@ -155,5 +155,11 @@ namespace WeatherApp.Server.Services
                 u => u.SupabaseUserId == supabaseUserId,
                 Builders<UserProfile>.Update.Set(u => u.LastLogin, DateTime.UtcNow));
         }
+
+        // Get all users - FIXED
+        public async Task<List<UserProfile>> GetAllUsersAsync()
+        {
+            return await _userCollection.Find(_ => true).ToListAsync();
+        }
     }
 }

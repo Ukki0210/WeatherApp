@@ -4,6 +4,8 @@
 @inject UserProfileApiService UserProfileApi
 @inject AuthService AuthService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IDisposable
 
 <PageTitle>Profile - Weather App</PageTitle>
 
@@ -39,7 +41,7 @@
                     <div class="info-grid">
                         <div class="info-item">
                             <label>Display Name</label>
-                            <input type="text" @bind="displayName" class="form-input" />
+                            <input type="text" @bind="displayName" @bind:event="oninput" class="form-input" />
                         </div>
                         <div class="info-item">
                             <label>Email Address</label>
@@ -69,9 +71,10 @@
                                     <p>Choose your preferred temperature unit</p>
                                 </div>
                             </div>
-                            <select @bind="temperatureUnit" class="form-select">
-                                <option value="celsius">Celsius (°C)</option>
-                                <option value="fahrenheit">Fahrenheit (°F)</option>
+                            <select @bind="temperatureUnit" @bind:after="OnTemperatureUnitChanged" class="form-select">
+                                <option value="Celsius">Celsius (°C)</option>
+                                <option value="Fahrenheit">Fahrenheit (°F)</option>
+                                <option value="Kelvin">Kelvin (K)</option>
                             </select>
                         </div>
 
@@ -84,7 +87,7 @@
                                 </div>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" @bind="darkMode" />
+                                <input type="checkbox" @bind="darkMode" @bind:after="OnDarkModeChanged" />
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
@@ -97,7 +100,7 @@
                                     <p>City to show on homepage</p>
                                 </div>
                             </div>
-                            <input type="text" @bind="defaultCity" class="form-input" placeholder="e.g., London" />
+                            <input type="text" @bind="defaultCity" @bind:event="oninput" @bind:after="OnDefaultCityChanged" class="form-input" placeholder="e.g., London" />
                         </div>
                     </div>
                 </div>
@@ -138,7 +141,7 @@
                             }
                             else
                             {
-                                <span>💾 Save Changes</span>
+                                <span>💾 Save All Changes</span>
                             }
                         </button>
                         <button @onclick="ResetProfile" class="btn btn-reset">
@@ -158,13 +161,386 @@
     }
 </div>
 
+<style>
+    .profile-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+        min-height: 100vh;
+    }
 
+    .profile-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .profile-header h1 {
+        font-size: 2.5em;
+        color: #667eea;
+        margin-bottom: 0.5rem;
+    }
+
+    .profile-header p {
+        color: #666;
+        font-size: 1.1em;
+    }
+
+    .auth-required {
+        background: white;
+        padding: 3rem;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 4rem;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    .spinner-small {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .profile-grid {
+        display: grid;
+        gap: 2rem;
+    }
+
+    .profile-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .profile-card h2 {
+        margin-bottom: 1.5rem;
+        color: #667eea;
+        font-size: 1.5em;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .info-item label {
+        display: block;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+
+    .info-item small {
+        display: block;
+        color: #999;
+        font-size: 0.85em;
+        margin-top: 0.25rem;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 0.75rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1em;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .form-input:disabled {
+        background: #f5f5f5;
+        cursor: not-allowed;
+    }
+
+    .preferences-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .preference-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem;
+        background: #f8f9fa;
+        border-radius: 12px;
+    }
+
+    .preference-label {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .preference-icon {
+        font-size: 2em;
+    }
+
+    .preference-label h4 {
+        margin: 0;
+        font-size: 1.1em;
+        color: #333;
+    }
+
+    .preference-label p {
+        margin: 0.25rem 0 0 0;
+        color: #666;
+        font-size: 0.9em;
+    }
+
+    .form-select {
+        padding: 0.75rem 1rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1em;
+        cursor: pointer;
+        background: white;
+    }
+
+    .form-select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    /* Toggle Switch */
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+        border-radius: 34px;
+    }
+
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+        background-color: #667eea;
+    }
+
+    input:checked + .toggle-slider:before {
+        transform: translateX(26px);
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .stat-box {
+        text-align: center;
+        padding: 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        color: white;
+    }
+
+    .stat-icon {
+        font-size: 2.5em;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-number {
+        font-size: 2em;
+        font-weight: bold;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+        font-size: 0.9em;
+        opacity: 0.9;
+    }
+
+    .actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-save {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-save:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-reset {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-reset:hover {
+        background: #5a6268;
+        transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .alert {
+        padding: 1rem;
+        border-radius: 8px;
+        margin-top: 1rem;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .alert-error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    /* Dark Mode */
+    :global(body.dark-mode) {
+        background: #1a1a2e;
+        color: #eee;
+    }
+
+    :global(body.dark-mode) .profile-card {
+        background: #16213e;
+        color: #eee;
+    }
+
+    :global(body.dark-mode) .profile-header h1 {
+        color: #7f8ff4;
+    }
+
+    :global(body.dark-mode) .profile-header p {
+        color: #bbb;
+    }
+
+    :global(body.dark-mode) .preference-item {
+        background: #0f3460;
+    }
+
+    :global(body.dark-mode) .preference-label h4 {
+        color: #eee;
+    }
+
+    :global(body.dark-mode) .preference-label p {
+        color: #bbb;
+    }
+
+    :global(body.dark-mode) .form-input,
+    :global(body.dark-mode) .form-select {
+        background: #0f3460;
+        border-color: #1a5490;
+        color: #eee;
+    }
+
+    :global(body.dark-mode) .form-input:disabled {
+        background: #0a2540;
+    }
+
+    :global(body.dark-mode) .info-item label {
+        color: #eee;
+    }
+
+    @@media (max-width: 768px) {
+        .profile-container {
+            padding: 1rem;
+        }
+
+        .preference-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .form-select {
+            width: 100%;
+        }
+    }
+</style>
 
 @code {
     private UserProfile? userProfile;
     private string displayName = "";
     private string defaultCity = "";
-    private string temperatureUnit = "celsius";
+    private string temperatureUnit = "Celsius";
     private bool darkMode = false;
     private DateTime createdAt = DateTime.UtcNow;
     private DateTime lastLogin = DateTime.UtcNow;
@@ -184,6 +560,108 @@
         }
 
         await LoadProfile();
+        await LoadPreferences();
+    }
+
+    private async Task LoadPreferences()
+    {
+        try
+        {
+            // Load from localStorage
+            var savedUnit = await JS.InvokeAsync<string>("localStorage.getItem", "temperatureUnit");
+            if (!string.IsNullOrEmpty(savedUnit))
+            {
+                temperatureUnit = savedUnit;
+                Console.WriteLine($"✅ Loaded temperature unit: {temperatureUnit}");
+            }
+
+            var darkModeStr = await JS.InvokeAsync<string>("localStorage.getItem", "darkMode");
+            darkMode = darkModeStr == "true";
+            Console.WriteLine($"✅ Loaded dark mode: {darkMode}");
+
+            var savedCity = await JS.InvokeAsync<string>("localStorage.getItem", "defaultCity");
+            if (!string.IsNullOrEmpty(savedCity))
+            {
+                defaultCity = savedCity;
+                Console.WriteLine($"✅ Loaded default city: {defaultCity}");
+            }
+
+            // Apply dark mode on load
+            if (darkMode)
+            {
+                await JS.InvokeVoidAsync("document.body.classList.add", "dark-mode");
+                Console.WriteLine("✅ Dark mode applied on load");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading preferences: {ex.Message}");
+        }
+    }
+
+    private async Task OnTemperatureUnitChanged()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", "temperatureUnit", temperatureUnit);
+            Console.WriteLine($"✅ Temperature unit saved: {temperatureUnit}");
+            message = $"🌡️ Temperature unit changed to {temperatureUnit}. Refresh pages to see changes.";
+            isError = false;
+            await ClearMessageAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error saving temperature unit: {ex.Message}");
+            message = $"Error: {ex.Message}";
+            isError = true;
+        }
+    }
+
+    private async Task OnDarkModeChanged()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", "darkMode", darkMode.ToString().ToLower());
+            Console.WriteLine($"✅ Dark mode saved: {darkMode}");
+
+            if (darkMode)
+            {
+                await JS.InvokeVoidAsync("document.body.classList.add", "dark-mode");
+                message = "🌙 Dark mode enabled";
+                Console.WriteLine("✅ Dark mode class added");
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("document.body.classList.remove", "dark-mode");
+                message = "☀️ Light mode enabled";
+                Console.WriteLine("✅ Dark mode class removed");
+            }
+
+            isError = false;
+            await ClearMessageAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error toggling dark mode: {ex.Message}");
+            message = $"Error: {ex.Message}";
+            isError = true;
+        }
+    }
+
+    private async Task OnDefaultCityChanged()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", "defaultCity", defaultCity);
+            Console.WriteLine($"✅ Default city saved: {defaultCity}");
+            message = $"🏠 Default city set to {defaultCity}";
+            isError = false;
+            await ClearMessageAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error saving default city: {ex.Message}");
+        }
     }
 
     private async Task LoadProfile()
@@ -192,16 +670,15 @@
         try
         {
             userProfile = await UserProfileApi.GetProfileAsync(AuthService.CurrentUserId ?? "");
-            
+
             if (userProfile != null)
             {
-                displayName = userProfile.DisplayName;
-                defaultCity = userProfile.DefaultCity;
-                temperatureUnit = userProfile.TemperatureUnit;
-                darkMode = userProfile.DarkMode;
+                displayName = userProfile.DisplayName ?? "User";
+                defaultCity = userProfile.DefaultCity ?? "";
                 createdAt = userProfile.CreatedAt;
                 lastLogin = userProfile.LastLogin;
-                favoritesCount = userProfile.FavoriteCities.Count;
+                favoritesCount = userProfile.FavoriteCities?.Count ?? 0;
+                searchesCount = 0; // Will track this later
                 daysActive = (DateTime.UtcNow - userProfile.CreatedAt).Days;
             }
             else
@@ -213,14 +690,24 @@
                     Email = AuthService.CurrentUserEmail ?? "",
                     DisplayName = "User",
                     CreatedAt = DateTime.UtcNow,
-                    LastLogin = DateTime.UtcNow
+                    LastLogin = DateTime.UtcNow,
+                    DefaultCity = "",
+                    TemperatureUnit = "Celsius",
+                    DarkMode = false
                 };
                 await UserProfileApi.CreateOrUpdateProfileAsync(userProfile);
+                
+                displayName = "User";
+                createdAt = DateTime.UtcNow;
+                lastLogin = DateTime.UtcNow;
+                favoritesCount = 0;
+                searchesCount = 0;
+                daysActive = 0;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading profile: {ex.Message}");
+            Console.WriteLine($"❌ Error loading profile: {ex.Message}");
             message = "Error loading profile. Please try again.";
             isError = true;
         }
@@ -237,6 +724,24 @@
 
         try
         {
+            // Save to localStorage first
+            await JS.InvokeVoidAsync("localStorage.setItem", "temperatureUnit", temperatureUnit);
+            await JS.InvokeVoidAsync("localStorage.setItem", "darkMode", darkMode.ToString().ToLower());
+            await JS.InvokeVoidAsync("localStorage.setItem", "defaultCity", defaultCity);
+
+            Console.WriteLine($"✅ Saved to localStorage - Temp: {temperatureUnit}, Dark: {darkMode}, City: {defaultCity}");
+
+            // Apply dark mode immediately if changed
+            if (darkMode)
+            {
+                await JS.InvokeVoidAsync("document.body.classList.add", "dark-mode");
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("document.body.classList.remove", "dark-mode");
+            }
+
+            // Save to database
             var result = await UserProfileApi.UpdatePreferencesAsync(
                 AuthService.CurrentUserId ?? "",
                 darkMode,
@@ -247,7 +752,7 @@
             if (result)
             {
                 // Update display name if changed
-                if (userProfile != null)
+                if (userProfile != null && displayName != userProfile.DisplayName)
                 {
                     userProfile.DisplayName = displayName;
                     userProfile.DefaultCity = defaultCity;
@@ -256,23 +761,26 @@
                     await UserProfileApi.CreateOrUpdateProfileAsync(userProfile);
                 }
 
-                message = "✅ Profile saved successfully!";
+                message = "✅ All changes saved successfully! Temperature changes will appear after page refresh.";
                 isError = false;
+                Console.WriteLine("✅ Profile saved successfully");
             }
             else
             {
-                message = "Failed to save profile. Please try again.";
+                message = "Failed to save profile to database. Settings saved locally.";
                 isError = true;
             }
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"❌ Error saving profile: {ex.Message}");
             message = $"Error: {ex.Message}";
             isError = true;
         }
         finally
         {
             isSaving = false;
+            await ClearMessageAfterDelay();
         }
     }
 
@@ -280,10 +788,33 @@
     {
         displayName = userProfile?.DisplayName ?? "User";
         defaultCity = "";
-        temperatureUnit = "celsius";
+        temperatureUnit = "Celsius";
         darkMode = false;
-        
-        message = "Settings reset to defaults. Click 'Save Changes' to apply.";
+
+        // Remove dark mode class immediately
+        await JS.InvokeVoidAsync("document.body.classList.remove", "dark-mode");
+
+        // Clear localStorage
+        await JS.InvokeVoidAsync("localStorage.removeItem", "temperatureUnit");
+        await JS.InvokeVoidAsync("localStorage.removeItem", "darkMode");
+        await JS.InvokeVoidAsync("localStorage.removeItem", "defaultCity");
+
+        Console.WriteLine("✅ Settings reset to defaults");
+
+        message = "⚠️ Settings reset to defaults. Click 'Save All Changes' to apply.";
         isError = false;
+        await ClearMessageAfterDelay();
+    }
+
+    private async Task ClearMessageAfterDelay()
+    {
+        await Task.Delay(5000);
+        message = null;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        // Cleanup if needed
     }
 }

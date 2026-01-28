@@ -1,0 +1,143 @@
+@page "/alerts"
+@using WeatherApp.Shared.Models
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Weather Alerts</PageTitle>
+
+<div class="container mt-4">
+    <h3 class="mb-4">Active Weather Alerts</h3>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label for="locationInput" class="form-label">Location:</label>
+                    <input type="text" 
+                           id="locationInput" 
+                           class="form-control" 
+                           @bind="location" 
+                           @bind:event="oninput" 
+                           placeholder="Enter city name" />
+                </div>
+                <div class="col-md-4 d-flex align-items-end gap-2">
+                    <button class="btn btn-primary" @onclick="LoadAlerts">Get Alerts</button>
+                    <button class="btn btn-secondary" @onclick="EnableNotifications">Enable Notifications</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3">Loading alerts...</p>
+        </div>
+    }
+    else if (alerts == null || !alerts.Any())
+    {
+        <div class="alert alert-info">No active alerts for <strong>@location</strong>.</div>
+    }
+    else
+    {
+        @foreach (var alert in alerts)
+        {
+            var severity = alert.Severity;
+            var title = alert.Title;
+            var description = alert.Description;
+            var alertType = alert.Type;
+            var endTime = alert.EndTime;
+
+            <div class="alert alert-@GetBootstrapClass(severity)">
+                <h4>@title</h4>
+                <p>@description</p>
+                <hr>
+                <div><strong>Severity:</strong> @severity</div>
+                <div><strong>Type:</strong> @alertType</div>
+                <div><strong>Valid until:</strong> @endTime.ToLocalTime().ToString("g")</div>
+            </div>
+        }
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (!string.IsNullOrEmpty(notificationStatus))
+    {
+        <div class="alert alert-success">@notificationStatus</div>
+    }
+</div>
+
+@code {
+    private string location = "Chennai";
+    private List<ActiveWeatherAlert>? alerts;
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+    private string notificationStatus = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAlerts();
+    }
+
+    private async Task LoadAlerts()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        
+        try
+        {
+            alerts = await Http.GetFromJsonAsync<List<ActiveWeatherAlert>>($"api/alerts/{location}");
+            
+            if (alerts?.Any(a => a.Severity == "Warning") == true)
+            {
+                var warningAlert = alerts.First(a => a.Severity == "Warning");
+                await ShowNotification(warningAlert);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task EnableNotifications()
+    {
+        try
+        {
+            var permission = await JS.InvokeAsync<string>("requestNotificationPermission");
+            notificationStatus = permission == "granted" ? "Notifications enabled!" : "Permission denied";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task ShowNotification(ActiveWeatherAlert alert)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("showNotification", alert.Title, alert.Description);
+        }
+        catch { }
+    }
+
+    private string GetBootstrapClass(string severity)
+    {
+        return severity switch
+        {
+            "Warning" => "danger",
+            "Watch" => "warning",
+            "Advisory" => "info",
+            _ => "secondary"
+        };
+    }
+}

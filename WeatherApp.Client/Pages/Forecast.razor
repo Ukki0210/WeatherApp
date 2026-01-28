@@ -1,8 +1,10 @@
 @page "/forecast/{city}"
 @using WeatherApp.Client.Services
+@using WeatherApp.Client.Helpers
 @using WeatherApp.Shared.Models
 @inject WeatherApiService WeatherApi
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>5-Day Forecast - @City</PageTitle>
 
@@ -65,8 +67,72 @@
                 </div>
             </div>
 
-            <!-- Forecast Cards -->
+            <!-- Statistics Summary Cards -->
+            <div class="stats-summary">
+                <div class="stat-card">
+                    <div class="stat-icon">🌡️</div>
+                    <div class="stat-content">
+                        <span class="stat-label">Average Temperature</span>
+                        <span class="stat-value">@GetAverageTemp()</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📈</div>
+                    <div class="stat-content">
+                        <span class="stat-label">Highest Temperature</span>
+                        <span class="stat-value">@GetHighestTemp()</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📉</div>
+                    <div class="stat-content">
+                        <span class="stat-label">Lowest Temperature</span>
+                        <span class="stat-value">@GetLowestTemp()</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💧</div>
+                    <div class="stat-content">
+                        <span class="stat-label">Average Humidity</span>
+                        <span class="stat-value">@GetAverageHumidity()%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="charts-section">
+                <h3 class="charts-title">📊 Weather Trends & Analysis</h3>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h4 class="chart-title">🌡️ Temperature Trend</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="temperatureChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h4 class="chart-title">💧 Humidity Levels</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="humidityChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h4 class="chart-title">💨 Wind Speed</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="windChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h4 class="chart-title">🌧️ Rain Probability</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="rainChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forecast Timeline -->
             <div class="forecast-timeline">
+                <h3 class="timeline-title">📅 Detailed Hourly Forecast</h3>
                 @foreach (var group in GroupForecastsByDay())
                 {
                     var dayForecasts = group.Value;
@@ -83,15 +149,15 @@
                             </div>
                             <div class="day-summary">
                                 <div class="temp-range">
-                                    <span class="temp-high">↑ @Math.Round(maxTemp)°</span>
+                                    <span class="temp-high">↑ @FormatTemperature(maxTemp)</span>
                                     <span class="temp-divider">/</span>
-                                    <span class="temp-low">↓ @Math.Round(minTemp)°</span>
+                                    <span class="temp-low">↓ @FormatTemperature(minTemp)</span>
                                 </div>
-                                <div class="avg-temp">Avg: @Math.Round(avgTemp)°C</div>
+                                <div class="avg-temp">Avg: @FormatTemperature(avgTemp)</div>
                             </div>
                         </div>
 
-                        <!-- Hourly Forecast Cards -->
+                        <!-- Hourly Forecast Cards - Scrollable -->
                         <div class="hourly-scroll">
                             <div class="hourly-grid">
                                 @foreach (var forecast in dayForecasts)
@@ -108,8 +174,8 @@
                                         </div>
                                         
                                         <div class="card-temp">
-                                            <span class="temp-value">@Math.Round(forecast.Temperature)</span>
-                                            <span class="temp-unit">°C</span>
+                                            <span class="temp-value">@Math.Round(TemperatureConverter.Convert(forecast.Temperature, temperatureUnit))</span>
+                                            <span class="temp-unit">@TemperatureConverter.GetUnitSymbol(temperatureUnit)</span>
                                         </div>
                                         
                                         <div class="card-description">@forecast.Description</div>
@@ -143,6 +209,711 @@
     </div>
 </div>
 
+<style>
+    .forecast-page {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    /* Hero Header */
+    .forecast-hero {
+        position: relative;
+        padding: 3rem 2rem;
+        overflow: hidden;
+    }
+
+    .hero-background {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%);
+        animation: gradientShift 15s ease infinite;
+    }
+
+    .hero-content {
+        position: relative;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .btn-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+
+    .btn-back:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateX(-5px);
+    }
+
+    .back-arrow {
+        font-size: 1.2rem;
+    }
+
+    .hero-title {
+        text-align: center;
+        color: white;
+        margin-top: 2rem;
+    }
+
+    .forecast-icon-large {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        animation: bounce 2s ease-in-out infinite;
+    }
+
+    .hero-title h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .hero-title h2 {
+        font-size: 1.5rem;
+        opacity: 0.9;
+    }
+
+    /* Container */
+    .forecast-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+        overflow-x: hidden;
+    }
+
+    /* Loading State */
+    .loading-state {
+        background: white;
+        border-radius: 15px;
+        padding: 4rem;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .loading-animation {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2rem;
+    }
+
+    .spinner-large {
+        width: 60px;
+        height: 60px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    .loading-dots {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .loading-dots span {
+        width: 12px;
+        height: 12px;
+        background: #667eea;
+        border-radius: 50%;
+        animation: bounce 1.4s ease-in-out infinite;
+    }
+
+    .loading-dots span:nth-child(1) {
+        animation-delay: -0.32s;
+    }
+
+    .loading-dots span:nth-child(2) {
+        animation-delay: -0.16s;
+    }
+
+    .loading-text {
+        font-size: 1.2rem;
+        color: #666;
+        margin-top: 1rem;
+    }
+
+    /* Error State */
+    .error-state {
+        background: white;
+        border-radius: 15px;
+        padding: 4rem;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .error-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+
+    .btn-retry {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .btn-retry:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+    }
+
+    /* Summary Card */
+    .summary-card {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        margin-bottom: 2rem;
+    }
+
+    .summary-icon {
+        font-size: 3rem;
+    }
+
+    .summary-content h3 {
+        font-size: 1.5rem;
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+
+    .summary-content p {
+        color: #666;
+    }
+
+    .summary-badge {
+        margin-left: auto;
+        text-align: right;
+    }
+
+    .badge-text {
+        display: block;
+        font-size: 0.85rem;
+        color: #999;
+    }
+
+    .badge-time {
+        display: block;
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #667eea;
+    }
+
+    /* Statistics Summary */
+    .stats-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-icon {
+        font-size: 2.5rem;
+    }
+
+    .stat-content {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: #666;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #667eea;
+    }
+
+    /* Charts Section */
+    .charts-section {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        margin-bottom: 2rem;
+        overflow: hidden;
+    }
+
+    .charts-title {
+        text-align: center;
+        color: #667eea;
+        font-size: 1.75rem;
+        margin-bottom: 2rem;
+    }
+
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 1.5rem;
+        max-width: 100%;
+    }
+
+    .chart-card {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        max-width: 100%;
+    }
+
+    .chart-title {
+        text-align: center;
+        color: #333;
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    .chart-wrapper {
+        position: relative;
+        height: 250px;
+        width: 100%;
+    }
+
+    .chart-card canvas {
+        display: block !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 250px !important;
+    }
+
+    /* Timeline */
+    .forecast-timeline {
+        margin-top: 2rem;
+    }
+
+    .timeline-title {
+        color: white;
+        font-size: 1.75rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .day-section {
+        margin-bottom: 2rem;
+    }
+
+    .day-header-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: white;
+        padding: 1.5rem 2rem;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1rem;
+    }
+
+    .day-name {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #667eea;
+    }
+
+    .day-month {
+        font-size: 0.9rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+
+    .day-summary {
+        text-align: right;
+    }
+
+    .temp-range {
+        font-size: 1.3rem;
+        font-weight: bold;
+        margin-bottom: 0.25rem;
+    }
+
+    .temp-high {
+        color: #ff6b6b;
+    }
+
+    .temp-divider {
+        color: #ccc;
+        margin: 0 0.5rem;
+    }
+
+    .temp-low {
+        color: #4ecdc4;
+    }
+
+    .avg-temp {
+        font-size: 0.9rem;
+        color: #666;
+    }
+
+    /* ========================================
+       FIXED HORIZONTAL SCROLLING
+       ======================================== */
+
+    /* Hourly Scroll Container */
+    .hourly-scroll {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 1rem 0 1.5rem 0;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #667eea rgba(255, 255, 255, 0.3);
+    }
+
+    /* Custom Scrollbar for Webkit (Chrome, Safari, Edge) */
+    .hourly-scroll::-webkit-scrollbar {
+        height: 14px;
+    }
+
+    .hourly-scroll::-webkit-scrollbar-track {
+        background: linear-gradient(to right, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.3));
+        border-radius: 10px;
+        margin: 0 1rem;
+        box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .hourly-scroll::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
+    }
+
+    .hourly-scroll::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #5568d3 0%, #6a3d8c 100%);
+        border: 3px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.6);
+    }
+
+    .hourly-scroll::-webkit-scrollbar-thumb:active {
+        background: linear-gradient(135deg, #4556c0 0%, #5a2d7c 100%);
+    }
+
+    /* Hourly Grid - KEY FIX: Use inline-flex with nowrap */
+    .hourly-grid {
+        display: inline-flex;
+        flex-wrap: nowrap;
+        gap: 1rem;
+        padding: 0 0.5rem;
+    }
+
+    /* Forecast Card */
+    .forecast-card {
+        flex: 0 0 220px;
+        min-width: 220px;
+        max-width: 220px;
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        animation: fadeIn 0.5s ease;
+    }
+
+    .forecast-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.3);
+    }
+
+    .card-time {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+
+    .time-period {
+        font-size: 0.85rem;
+        color: #999;
+        margin-left: 0.25rem;
+    }
+
+    .card-icon-wrapper {
+        position: relative;
+        text-align: center;
+        margin: 1rem 0;
+    }
+
+    .card-icon {
+        font-size: 3rem;
+        position: relative;
+        z-index: 1;
+        animation: float 3s ease-in-out infinite;
+    }
+
+    .icon-glow {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60px;
+        height: 60px;
+        background: radial-gradient(circle, rgba(102, 126, 234, 0.2) 0%, transparent 70%);
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    .card-temp {
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .temp-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #667eea;
+    }
+
+    .temp-unit {
+        font-size: 1.2rem;
+        color: #999;
+    }
+
+    .card-description {
+        text-align: center;
+        color: #666;
+        text-transform: capitalize;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    .card-metrics {
+        display: flex;
+        justify-content: space-around;
+        padding-top: 1rem;
+        border-top: 1px solid #eee;
+    }
+
+    .metric {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .metric-icon {
+        font-size: 1.2rem;
+    }
+
+    .metric-value {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .rain-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+        padding: 0.5rem;
+        background: #e3f2fd;
+        border-radius: 8px;
+    }
+
+    .rain-icon {
+        font-size: 1.2rem;
+    }
+
+    .rain-amount {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #1976d2;
+    }
+
+    /* Animations */
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    @@keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+    }
+
+    @@keyframes pulse {
+        0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+        50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+    }
+
+    @@keyframes gradientShift {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
+
+    /* Dark Mode */
+    :global(body.dark-mode) .forecast-page {
+        background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+    }
+
+    :global(body.dark-mode) .summary-card,
+    :global(body.dark-mode) .stat-card,
+    :global(body.dark-mode) .day-header-card,
+    :global(body.dark-mode) .forecast-card,
+    :global(body.dark-mode) .charts-section,
+    :global(body.dark-mode) .loading-state,
+    :global(body.dark-mode) .error-state {
+        background: #16213e;
+        color: #eee;
+    }
+
+    :global(body.dark-mode) .chart-card {
+        background: #0f3460;
+    }
+
+    :global(body.dark-mode) .summary-content h3,
+    :global(body.dark-mode) .day-name,
+    :global(body.dark-mode) .card-time,
+    :global(body.dark-mode) .metric-value,
+    :global(body.dark-mode) .chart-title,
+    :global(body.dark-mode) .charts-title {
+        color: #eee;
+    }
+
+    :global(body.dark-mode) .summary-content p,
+    :global(body.dark-mode) .day-month,
+    :global(body.dark-mode) .avg-temp,
+    :global(body.dark-mode) .card-description,
+    :global(body.dark-mode) .stat-label {
+        color: #bbb;
+    }
+
+    /* Dark Mode Scrollbar */
+    :global(body.dark-mode) .hourly-scroll::-webkit-scrollbar-track {
+        background: linear-gradient(to right, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.3));
+    }
+
+    :global(body.dark-mode) .hourly-scroll::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #7f8ff4 0%, #8b5fc7 100%);
+        border: 3px solid rgba(255, 255, 255, 0.1);
+    }
+
+    :global(body.dark-mode) .hourly-scroll::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #9099f7 0%, #9d6fd9 100%);
+        border: 3px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Mobile Responsive */
+    @@media (max-width: 768px) {
+        .forecast-hero {
+            padding: 2rem 1rem;
+        }
+
+        .forecast-container {
+            padding: 1rem;
+        }
+
+        .day-header-card {
+            flex-direction: column;
+            text-align: center;
+            gap: 1rem;
+        }
+
+        .day-summary {
+            text-align: center;
+        }
+
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .stats-summary {
+            grid-template-columns: 1fr;
+        }
+
+        .hourly-scroll::-webkit-scrollbar {
+            height: 10px;
+        }
+
+        .forecast-card {
+            flex: 0 0 200px;
+            min-width: 200px;
+            max-width: 200px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .chart-wrapper {
+            height: 200px;
+        }
+
+        .hourly-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .forecast-card {
+            flex: 0 0 180px;
+            min-width: 180px;
+            max-width: 180px;
+            padding: 1rem;
+        }
+    }
+</style>
+
 @code {
     [Parameter]
     public string City { get; set; } = "";
@@ -150,10 +921,52 @@
     private ForecastData? forecastData;
     private bool isLoading = false;
     private string? errorMessage;
+    private string temperatureUnit = "Celsius";
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadTemperaturePreference();
         await LoadForecast();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && forecastData != null && forecastData.Forecasts.Any())
+        {
+            await Task.Delay(200);
+            await RenderCharts();
+        }
+    }
+
+    private async Task LoadTemperaturePreference()
+    {
+        try
+        {
+            var savedUnit = await JS.InvokeAsync<string>("localStorage.getItem", "temperatureUnit");
+            if (!string.IsNullOrEmpty(savedUnit))
+            {
+                temperatureUnit = savedUnit;
+                Console.WriteLine($"✅ Loaded temperature unit: {temperatureUnit}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading temperature preference: {ex.Message}");
+        }
+    }
+
+    private string FormatTemperature(double celsius)
+    {
+        try
+        {
+            var temp = TemperatureConverter.Convert(celsius, temperatureUnit);
+            var symbol = TemperatureConverter.GetUnitSymbol(temperatureUnit);
+            return $"{Math.Round(temp)}{symbol}";
+        }
+        catch
+        {
+            return $"{Math.Round(celsius)}°C";
+        }
     }
 
     private async Task LoadForecast()
@@ -171,18 +984,78 @@
         {
             forecastData = await WeatherApi.GetForecastAsync(City);
 
-            if (forecastData == null)
+            if (forecastData == null || !forecastData.Forecasts.Any())
             {
                 errorMessage = $"Could not load forecast for {City}";
+            }
+            else
+            {
+                Console.WriteLine($"✅ Loaded {forecastData.Forecasts.Count} forecast items");
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"Error: {ex.Message}";
+            Console.WriteLine($"❌ Forecast error: {ex.Message}");
         }
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task RenderCharts()
+    {
+        try
+        {
+            if (forecastData == null || !forecastData.Forecasts.Any())
+            {
+                Console.WriteLine("⚠️ No forecast data to render charts");
+                return;
+            }
+
+            Console.WriteLine($"📊 Starting forecast chart rendering with {forecastData.Forecasts.Count} data points");
+
+            // Group by day and take average per day for cleaner charts
+            var dailyGroups = forecastData.Forecasts
+                .GroupBy(f => f.DateTime.Date)
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    AvgTemp = g.Average(f => f.Temperature),
+                    AvgHumidity = g.Average(f => f.Humidity),
+                    AvgWind = g.Average(f => f.WindSpeed),
+                    RainProb = g.Any(f => f.RainVolume > 0) ? 80.0 : 20.0
+                })
+                .OrderBy(d => d.Date)
+                .Take(5)
+                .ToList();
+
+            if (!dailyGroups.Any())
+            {
+                Console.WriteLine("⚠️ No daily groups created");
+                return;
+            }
+
+            var dates = dailyGroups.Select(d => d.Date.ToString("MMM dd")).ToArray();
+            var temperatures = dailyGroups.Select(d => TemperatureConverter.Convert(d.AvgTemp, temperatureUnit)).ToArray();
+            var humidity = dailyGroups.Select(d => d.AvgHumidity).ToArray();
+            var windSpeed = dailyGroups.Select(d => d.AvgWind).ToArray();
+            var rainProb = dailyGroups.Select(d => d.RainProb).ToArray();
+            var tempSymbol = TemperatureConverter.GetUnitSymbol(temperatureUnit);
+
+            Console.WriteLine($"Dates: {string.Join(", ", dates)}");
+            Console.WriteLine($"Temperatures: {string.Join(", ", temperatures)}");
+
+            await JS.InvokeVoidAsync("createForecastCharts",
+                dates, temperatures, humidity, windSpeed, rainProb, tempSymbol);
+
+            Console.WriteLine("✅ Forecast charts rendered successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error rendering charts: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
     }
 
@@ -193,7 +1066,9 @@
 
         return forecastData.Forecasts
             .GroupBy(f => f.DateTime.Date)
-            .ToDictionary(g => g.Key, g => g.ToList());
+            .OrderBy(g => g.Key)
+            .Take(5)
+            .ToDictionary(g => g.Key, g => g.OrderBy(f => f.DateTime).ToList());
     }
 
     private void GoBack()
@@ -219,5 +1094,32 @@
             "50d" or "50n" => "🌫️",
             _ => "🌤️"
         };
+    }
+
+    private string GetAverageTemp()
+    {
+        if (forecastData == null || !forecastData.Forecasts.Any()) return "N/A";
+        var avg = forecastData.Forecasts.Average(f => f.Temperature);
+        return FormatTemperature(avg);
+    }
+
+    private string GetHighestTemp()
+    {
+        if (forecastData == null || !forecastData.Forecasts.Any()) return "N/A";
+        var max = forecastData.Forecasts.Max(f => f.Temperature);
+        return FormatTemperature(max);
+    }
+
+    private string GetLowestTemp()
+    {
+        if (forecastData == null || !forecastData.Forecasts.Any()) return "N/A";
+        var min = forecastData.Forecasts.Min(f => f.Temperature);
+        return FormatTemperature(min);
+    }
+
+    private int GetAverageHumidity()
+    {
+        if (forecastData == null || !forecastData.Forecasts.Any()) return 0;
+        return (int)forecastData.Forecasts.Average(f => f.Humidity);
     }
 }

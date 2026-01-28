@@ -1,4 +1,6 @@
-﻿<Router AppAssembly="@typeof(App).Assembly">
+﻿@inject IJSRuntime JS
+
+<Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
@@ -50,5 +52,44 @@
 
     .btn-home:hover {
         transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    /* Dark Mode for 404 Page */
+    :global(body.dark-mode) .not-found h1 {
+        color: #7f8ff4;
+    }
+
+    :global(body.dark-mode) .not-found p {
+        color: #bbb;
     }
 </style>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Load dark mode preference from localStorage
+                var darkMode = await JS.InvokeAsync<string>("localStorage.getItem", "darkMode");
+                Console.WriteLine($"🌙 App.razor - Dark mode value from localStorage: {darkMode}");
+                
+                if (darkMode == "true")
+                {
+                    await JS.InvokeVoidAsync("document.body.classList.add", "dark-mode");
+                    Console.WriteLine("✅ App.razor - Dark mode class added to body");
+                }
+                else
+                {
+                    Console.WriteLine("☀️ App.razor - Light mode active");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ App.razor - Error loading dark mode: {ex.Message}");
+            }
+        }
+    }
+}

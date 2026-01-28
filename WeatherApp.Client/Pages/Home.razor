@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using WeatherApp.Client.Services
+@using WeatherApp.Client.Helpers
 @using WeatherApp.Shared.Models
 @using System.Text
 @inject WeatherApiService WeatherApi
@@ -8,6 +9,7 @@
 @inject AIWeatherService AIWeatherService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject HttpClient Http
 
 <PageTitle>Home - Weather App</PageTitle>
 
@@ -73,6 +75,22 @@
                     @errorMessage
                 </div>
             }
+
+            @if (currentAlert != null)
+            {
+                <div class="alert-banner @GetAlertSeverityClass(currentAlert.Severity)" @key="currentAlert.Id">
+                    <div class="alert-content">
+                        <div class="alert-icon">@GetAlertIcon(currentAlert.Severity)</div>
+                        <div class="alert-details">
+                            <h4>@currentAlert.Title</h4>
+                            <p>@currentAlert.Description</p>
+                            <small>Valid until: @currentAlert.EndTime.ToLocalTime().ToString("g")</small>
+                        </div>
+                        <button class="alert-close" @onclick="DismissAlert">×</button>
+                    </div>
+                </div>
+            }
+
         </div>
     </div>
 
@@ -90,7 +108,7 @@
                         @GetWeatherEmoji(currentWeather.Icon)
                     </div>
                     <div class="weather-temp">
-                        <span class="temp-value">@Math.Round(currentWeather.Temperature)°C</span>
+                        <span class="temp-value">@FormatTemperature(currentWeather.Temperature)</span>
                         <p class="weather-desc">@currentWeather.Description</p>
                     </div>
                 </div>
@@ -100,7 +118,7 @@
                         <div class="detail-icon">🌡️</div>
                         <div class="detail-info">
                             <span class="detail-label">Feels Like</span>
-                            <span class="detail-value">@Math.Round(currentWeather.FeelsLike)°C</span>
+                            <span class="detail-value">@FormatTemperature(currentWeather.FeelsLike)</span>
                         </div>
                     </div>
 
@@ -205,7 +223,7 @@
                         <div class="city-icon">@GetWeatherEmoji(city.Icon)</div>
                         <h3>@city.Name</h3>
                         <p class="city-country">@city.Country</p>
-                        <p class="city-temp">@Math.Round(city.Temperature)°C</p>
+                        <p class="city-temp">@FormatTemperature(city.Temperature)</p>
                         <p class="city-desc">@city.Description</p>
                     </div>
                 }
@@ -583,6 +601,88 @@
         border: 1px solid #fcc;
     }
 
+    /* Alert Banner Styles - UPDATED */
+    .alert-banner {
+        background: linear-gradient(135deg, #f56565 0%, #ed8936 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 15px;
+        margin: 20px 0;
+        box-shadow: 0 5px 20px rgba(245, 101, 101, 0.4);
+        animation: slideDown 0.5s ease, pulseGlow 2s ease-in-out infinite;
+    }
+
+    
+    .alert-banner.critical {
+        background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+        box-shadow: 0 5px 30px rgba(220, 38, 38, 0.6);
+        animation: slideDown 0.5s ease, pulseGlowCritical 1.5s ease-in-out infinite;
+    }
+
+    
+    .alert-banner.warning {
+        background: linear-gradient(135deg, #f56565 0%, #ed8936 100%);
+        box-shadow: 0 5px 20px rgba(245, 101, 101, 0.4);
+        animation: slideDown 0.5s ease, pulseGlow 2s ease-in-out infinite;
+    }
+
+    .alert-content {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .alert-icon {
+        font-size: 3em;
+        animation: bounce 2s ease-in-out infinite;
+        filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+    }
+
+    .alert-details {
+        flex: 1;
+    }
+
+    .alert-details h4 {
+        margin: 0 0 5px 0;
+        font-size: 1.3em;
+        font-weight: 700;
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .alert-details p {
+        margin: 0 0 5px 0;
+        font-size: 1em;
+        opacity: 0.95;
+    }
+
+    .alert-details small {
+        font-size: 0.85em;
+        opacity: 0.8;
+    }
+
+    .alert-close {
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid white;
+        color: white;
+        font-size: 2em;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        line-height: 1;
+    }
+
+    .alert-close:hover {
+        background: white;
+        color: #f56565;
+        transform: rotate(90deg);
+    }
+
     .weather-display {
         margin-bottom: 30px;
     }
@@ -953,6 +1053,35 @@
         }
     }
 
+    @@keyframes slideDown {
+        from {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @@keyframes pulseGlow {
+        0%, 100% {
+            box-shadow: 0 5px 20px rgba(245, 101, 101, 0.4);
+        }
+        50% {
+            box-shadow: 0 5px 30px rgba(245, 101, 101, 0.7);
+        }
+    }
+
+    @@keyframes pulseGlowCritical {
+        0%, 100% {
+            box-shadow: 0 5px 30px rgba(220, 38, 38, 0.6);
+        }
+        50% {
+            box-shadow: 0 5px 40px rgba(220, 38, 38, 0.9);
+        }
+    }
+
     @@keyframes fadeIn {
         from {
             opacity: 0;
@@ -1043,6 +1172,15 @@
             background: rgba(0, 0, 0, 0.5);
         }
 
+        .alert-content {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .alert-icon {
+            font-size: 4em;
+        }
+
         .search-form {
             flex-direction: column;
         }
@@ -1070,6 +1208,9 @@
 
 @code {
     private string searchCity = "";
+    private ActiveWeatherAlert? currentAlert;
+    private bool notificationPermissionGranted = false;
+
     private WeatherData? currentWeather;
     private List<TopCity> topCities = new();
     private bool isLoading = false;
@@ -1078,6 +1219,7 @@
     private bool isLoadingAI = false;
     private string? errorMessage;
     private string? aiInsights;
+    private string temperatureUnit = "Celsius";
 
     // Video background variables
     private string currentVideoPath = "videos/sunny.mp4";
@@ -1086,7 +1228,142 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadTemperaturePreference();
         await LoadTopCities();
+    }
+
+    // UPDATED: Only show SEVERE alerts (Warning or Critical)
+    private async Task CheckForAlerts(string city)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<List<ActiveWeatherAlert>>($"api/alerts/{city}");
+            
+            if (response != null && response.Any())
+            {
+                // Only show SEVERE alerts (Warning or Critical)
+                currentAlert = response
+                    .Where(a => a.EndTime > DateTime.UtcNow && 
+                               (a.Severity == "Warning" || a.Severity == "Critical"))
+                    .OrderByDescending(a => GetSeverityPriority(a.Severity))
+                    .FirstOrDefault();
+
+                // Show browser notification for severe alerts
+                if (currentAlert != null)
+                {
+                    await ShowBrowserNotification(currentAlert);
+                }
+            }
+            else
+            {
+                // No alerts - clear current alert
+                currentAlert = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching alerts: {ex.Message}");
+            currentAlert = null;
+        }
+    }
+
+    private async Task ShowBrowserNotification(ActiveWeatherAlert alert)
+    {
+        try
+        {
+            if (!notificationPermissionGranted)
+            {
+                var permission = await JS.InvokeAsync<string>("requestNotificationPermission");
+                notificationPermissionGranted = permission == "granted";
+            }
+
+            if (notificationPermissionGranted)
+            {
+                await JS.InvokeVoidAsync("showNotification", alert.Title, alert.Description);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error showing notification: {ex.Message}");
+        }
+    }
+
+    // UPDATED: Added Critical priority level
+    private int GetSeverityPriority(string severity)
+    {
+        return severity switch
+        {
+            "Critical" => 4,    // Extreme danger (>=45°C, <=-15°C, etc.)
+            "Warning" => 3,     // Severe conditions (>=40°C, <=-10°C, etc.)
+            "Watch" => 2,       // Moderate conditions
+            "Advisory" => 1,    // Minor conditions
+            _ => 0
+        };
+    }
+
+    // NEW: Get CSS class for alert severity
+    private string GetAlertSeverityClass(string severity)
+    {
+        return severity.ToLower() switch
+        {
+            "critical" => "critical",
+            "warning" => "warning",
+            _ => ""
+        };
+    }
+
+    // NEW: Get appropriate icon for severity level
+    private string GetAlertIcon(string severity)
+    {
+        return severity switch
+        {
+            "Critical" => "🚨",     // Red siren for critical
+            "Warning" => "⚠️",      // Warning triangle for severe
+            "Watch" => "👁️",        // Eye for watch
+            "Advisory" => "ℹ️",     // Info for advisory
+            _ => "⚠️"
+        };
+    }
+
+    private void DismissAlert()
+    {
+        currentAlert = null;
+    }
+
+    private async Task LoadTemperaturePreference()
+    {
+        try
+        {
+            var savedUnit = await JS.InvokeAsync<string>("localStorage.getItem", "temperatureUnit");
+            if (!string.IsNullOrEmpty(savedUnit))
+            {
+                temperatureUnit = savedUnit;
+                Console.WriteLine($"✅ Home - Loaded temperature unit: {temperatureUnit}");
+            }
+            else
+            {
+                Console.WriteLine("⚠️ Home - No temperature unit saved, using default: Celsius");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Home - Error loading temperature preference: {ex.Message}");
+        }
+    }
+
+    private string FormatTemperature(double celsius)
+    {
+        try
+        {
+            var temp = TemperatureConverter.Convert(celsius, temperatureUnit);
+            var symbol = TemperatureConverter.GetUnitSymbol(temperatureUnit);
+            return $"{Math.Round(temp)}{symbol}";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Home - Error formatting temperature: {ex.Message}");
+            return $"{Math.Round(celsius)}°C"; // Fallback
+        }
     }
 
     private async Task GetAIInsights()
@@ -1099,15 +1376,15 @@
         try
         {
             var request = new WeatherInsightRequest
-            {
-                CityName = currentWeather.City,
-                Temperature = currentWeather.Temperature,
-                FeelsLike = currentWeather.FeelsLike,
-                Condition = currentWeather.Description,
-                Humidity = currentWeather.Humidity,
-                WindSpeed = currentWeather.WindSpeed,
-                Visibility = currentWeather.Visibility
-            };
+                {
+                    CityName = currentWeather.City,
+                    Temperature = currentWeather.Temperature,
+                    FeelsLike = currentWeather.FeelsLike,
+                    Condition = currentWeather.Description,
+                    Humidity = currentWeather.Humidity,
+                    WindSpeed = currentWeather.WindSpeed,
+                    Visibility = currentWeather.Visibility
+                };
 
             aiInsights = await AIWeatherService.GetWeatherInsightsAsync(request);
         }
@@ -1193,6 +1470,7 @@
 
         isLoading = true;
         errorMessage = null;
+        currentAlert = null;
         aiInsights = null;
 
         try
@@ -1208,6 +1486,7 @@
             {
                 currentWeatherCondition = currentWeather.Icon;
                 UpdateVideoBackground();
+                await CheckForAlerts(searchCity);
             }
         }
         catch (Exception ex)
@@ -1220,44 +1499,34 @@
         }
     }
 
-    private async Task SearchWeatherByCity(string city)
-    {
-        searchCity = city;
-        await SearchWeather();
-    }
-
     private async Task GetLocationWeather()
     {
         isLoadingLocation = true;
         errorMessage = null;
+        currentAlert = null;
         aiInsights = null;
 
         try
         {
             var position = await JS.InvokeAsync<GeolocationPosition>("getLocation");
 
-            if (position != null)
-            {
-                var userId = AuthService.IsAuthenticated ? AuthService.CurrentUserId : null;
-                currentWeather = await WeatherApi.GetWeatherByCoordinatesAsync(
-                    position.Coords.Latitude,
-                    position.Coords.Longitude,
-                    userId);
+            var userId = AuthService.IsAuthenticated ? AuthService.CurrentUserId : null;
+            currentWeather = await WeatherApi.GetWeatherByCoordinatesAsync(
+                position.Coords.Latitude,
+                position.Coords.Longitude,
+                userId);
 
-                if (currentWeather == null)
-                {
-                    errorMessage = "Could not fetch weather for your location";
-                }
-                else
-                {
-                    currentWeatherCondition = currentWeather.Icon;
-                    UpdateVideoBackground();
-                }
+            if (currentWeather != null)
+            {
+                searchCity = currentWeather.City;
+                currentWeatherCondition = currentWeather.Icon;
+                UpdateVideoBackground();
+                await CheckForAlerts(currentWeather.City);
             }
         }
         catch (Exception ex)
         {
-            errorMessage = $"Location error: {ex.Message}";
+            errorMessage = $"Error getting location: {ex.Message}";
         }
         finally
         {
@@ -1267,30 +1536,26 @@
 
     private void UpdateVideoBackground()
     {
-        var oldPath = currentVideoPath;
+        var icon = currentWeatherCondition.ToLower();
 
-        currentVideoPath = currentWeatherCondition switch
+        currentVideoPath = icon switch
         {
-            "01d" => "videos/sunny.mp4",
-            "01n" => "videos/night-clear.mp4",
-            "02d" or "02n" => "videos/cloudy.mp4",
-            "03d" or "03n" => "videos/cloudy.mp4",
-            "04d" or "04n" => "videos/cloudy.mp4",
-            "09d" or "09n" => "videos/rain.mp4",
-            "10d" or "10n" => "videos/rain.mp4",
-            "11d" or "11n" => "videos/rain.mp4",
-            "13d" or "13n" => "videos/snow.mp4",
-            "50d" or "50n" => "videos/fog.mp4",
+            "01d" or "01n" => "videos/sunny.mp4",
+            "02d" or "02n" or "03d" or "03n" or "04d" or "04n" => "videos/cloudy.mp4",
+            "09d" or "09n" or "10d" or "10n" => "videos/rain.mp4",
+            "11d" or "11n" => "videos/stormy.mp4",
+            "13d" or "13n" => "videos/snowy.mp4",
+            "50d" or "50n" => "videos/foggy.mp4",
             _ => "videos/sunny.mp4"
         };
 
         videoKey++;
-        StateHasChanged();
     }
 
     private async Task LoadTopCities()
     {
         isLoadingCities = true;
+
         try
         {
             topCities = await WeatherApi.GetTopCitiesAsync();
@@ -1305,66 +1570,15 @@
         }
     }
 
-    private async Task HandleKeyPress(KeyboardEventArgs e)
+    private async Task SearchWeatherByCity(string cityName)
     {
-        if (e.Key == "Enter")
-        {
-            await SearchWeather();
-        }
+        searchCity = cityName;
+        await SearchWeather();
     }
 
-    private async Task ViewForecast()
+    private string GetWeatherEmoji(string icon)
     {
-        if (currentWeather == null)
-        {
-            errorMessage = "Please search for weather first";
-            return;
-        }
-
-        Navigation.NavigateTo($"/forecast/{currentWeather.City}");
-    }
-
-    private async Task AddToFavorites()
-    {
-        if (currentWeather == null)
-        {
-            errorMessage = "Please search for weather first";
-            return;
-        }
-
-        if (!AuthService.IsAuthenticated)
-        {
-            errorMessage = "Please login to add favorites";
-            await Task.Delay(2000);
-            Navigation.NavigateTo("/login");
-            return;
-        }
-
-        try
-        {
-            var result = await UserProfileApi.AddFavoriteCityAsync(
-                AuthService.CurrentUserId ?? "",
-                currentWeather.City
-            );
-
-            if (result)
-            {
-                await JS.InvokeVoidAsync("alert", $"✅ {currentWeather.City} added to favorites!");
-            }
-            else
-            {
-                await JS.InvokeVoidAsync("alert", $"❌ {currentWeather.City} is already in your favorites");
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error adding to favorites: {ex.Message}";
-        }
-    }
-
-    private string GetWeatherEmoji(string iconCode)
-    {
-        return iconCode switch
+        return icon switch
         {
             "01d" => "☀️",
             "01n" => "🌙",
@@ -1382,12 +1596,55 @@
         };
     }
 
-    public class GeolocationPosition
+    private void ViewForecast()
     {
-        public GeolocationCoordinates Coords { get; set; } = new();
+        if (currentWeather != null)
+        {
+            Navigation.NavigateTo($"/forecast/{currentWeather.City}");
+        }
     }
 
-    public class GeolocationCoordinates
+    private async Task AddToFavorites()
+{
+    if (currentWeather == null || !AuthService.IsAuthenticated)
+        return;
+
+    try
+    {
+        var userId = AuthService.CurrentUserId;
+        if (string.IsNullOrEmpty(userId))
+        {
+            errorMessage = "User not authenticated";
+            return;
+        }
+
+        await UserProfileApi.AddFavoriteCityAsync(userId, currentWeather.City);
+        // Show success message (you can add a toast notification here)
+        Console.WriteLine($"✅ Added {currentWeather.City} to favorites");
+    }
+    catch (Exception ex)
+    {
+        errorMessage = $"Error adding to favorites: {ex.Message}";
+        Console.WriteLine($"❌ Error: {ex.Message}");
+    }
+}
+
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchWeather();
+        }
+    }
+
+    // GeolocationPosition helper class
+    public class GeolocationPosition
+    {
+        public GeolocationCoords Coords { get; set; } = new();
+    }
+
+    public class GeolocationCoords
     {
         public double Latitude { get; set; }
         public double Longitude { get; set; }

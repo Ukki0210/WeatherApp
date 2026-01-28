@@ -46,7 +46,7 @@ namespace WeatherApp.Server.Controllers
 
             if (result.Success)
             {
-                // Create user profile in MongoDB
+                
                 var profile = new UserProfile
                 {
                     SupabaseUserId = result.UserId,
@@ -62,7 +62,7 @@ namespace WeatherApp.Server.Controllers
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
-        // POST: api/auth/login
+        
         [HttpPost("login")]
         public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request)
         {
@@ -80,14 +80,14 @@ namespace WeatherApp.Server.Controllers
 
             if (result.Success)
             {
-                // Update last login
+                
                 await _userProfileService.UpdateLastLoginAsync(result.UserId);
             }
 
             return result.Success ? Ok(result) : Unauthorized(result);
         }
 
-        // POST: api/auth/logout
+        
         [HttpPost("logout")]
         public async Task<ActionResult> Logout()
         {
@@ -96,7 +96,7 @@ namespace WeatherApp.Server.Controllers
                          : BadRequest(new { message = "Logout failed" });
         }
 
-        // GET: api/auth/validate
+        
         [HttpGet("validate")]
         public async Task<ActionResult> ValidateToken()
         {

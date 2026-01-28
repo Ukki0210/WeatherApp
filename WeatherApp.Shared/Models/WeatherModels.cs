@@ -169,4 +169,19 @@ namespace WeatherApp.Shared.Models
         public string Description { get; set; } = string.Empty;
         public string Icon { get; set; } = string.Empty;
     }
+    // Add this at the end of WeatherModels.cs (before the closing brace)
+
+    // Active Weather Alert System (for real-time warnings)
+    public class ActiveWeatherAlert
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Severity { get; set; } = string.Empty;
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+        public string Location { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+    }
 }
+
