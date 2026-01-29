@@ -24,7 +24,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 // Register Background Service
 builder.Services.AddHostedService<FavoriteWeatherMonitorService>();
 
-// ✅ FIXED MongoDB Configuration - Match Render variable names
+// MongoDB Configuration
 var mongoConnectionString =
     Environment.GetEnvironmentVariable("MongoDB__ConnectionString")
     ?? builder.Configuration["MongoDB__ConnectionString"]
@@ -54,7 +54,7 @@ builder.Services.AddSingleton<IMongoDatabase>(sp =>
     return client.GetDatabase(mongoDatabaseName);
 });
 
-// ✅ FIXED Supabase Configuration
+// Supabase Configuration
 var supabaseUrl = 
     Environment.GetEnvironmentVariable("Supabase__Url")
     ?? builder.Configuration["Supabase__Url"]
@@ -83,7 +83,7 @@ builder.Services.AddScoped<WeatherService>();
 builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<SupabaseAuthService>();
 
-// ✅ FIXED JWT Authentication
+// JWT Authentication
 var jwtSecretKey = 
     Environment.GetEnvironmentVariable("Jwt__SecretKey")
     ?? builder.Configuration["Jwt__SecretKey"]
@@ -128,34 +128,8 @@ builder.Services.AddCors(options =>
     });
 });
 
+// BUILD THE APP (only once!)
 var app = builder.Build();
-
-// Configure Middleware Pipeline
-if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseRouting();
-app.UseCors("AllowAll");
-app.UseAuthentication();
-app.UseAuthorization();
-
-// Map Controllers
-app.MapControllers();
-
-// ROOT ENDPOINT
-app.MapGet("/", () => Results.Ok(new 
-{ 
-    message = "Weather App API is running!",
-    version = "1.0",
-    status = "healthy",
-    timestamp = DateTime.UtcNow
-}));
-
-// Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 // Startup Logs
 Console.WriteLine("===========================================");
@@ -175,6 +149,40 @@ catch (Exception ex)
 {
     Console.WriteLine($"❌ MongoDB test failed: {ex.Message}");
 }
+
+// ✅ Serve Blazor WebAssembly static files (FIRST - before routing)
+app.UseBlazorFrameworkFiles();
+app.UseStaticFiles();
+
+// Configure Swagger
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Weather App API v1");
+    c.RoutePrefix = "swagger";
+});
+
+// Configure Middleware Pipeline
+app.UseRouting();
+app.UseCors("AllowAll");
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Map Controllers
+app.MapControllers();
+
+// API Health Check Endpoint
+app.MapGet("/api", () => Results.Ok(new 
+{ 
+    message = "Weather App API is running!",
+    version = "1.0",
+    status = "healthy",
+    timestamp = DateTime.UtcNow
+}));
+
+// Health check endpoint
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
 // Debug: List all registered endpoints
 Console.WriteLine("==================== REGISTERED ENDPOINTS ====================");
 var endpoints = app.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints;
@@ -184,7 +192,7 @@ foreach (var endpoint in endpoints)
 }
 Console.WriteLine("==============================================================");
 
-app.Run();
-
+// ✅ Fallback to index.html for client-side routing (MUST BE LAST!)
+app.MapFallbackToFile("index.html");
 
 app.Run();
