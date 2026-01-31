@@ -5,41 +5,39 @@ using WeatherApp.Client.Services;
 using Blazored.LocalStorage;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
+
+// Root components
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// ✅ Read backend API URL from configuration (appsettings.json)
-// This allows different URLs for development vs production
-var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "https://weatherapp-6i2i.onrender.com";
+// 🔥 IMPORTANT:
+// For hosted Blazor (Client + Server together),
+// always use the SAME base address the app was loaded from.
+// This works locally AND on Render.
+builder.Services.AddScoped(sp =>
+    new HttpClient
+    {
+        BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+    });
 
-Console.WriteLine($"Connecting to API: {apiBaseUrl}");
-
-// ✅ Configure default HttpClient to point to backend API
-builder.Services.AddScoped(sp => new HttpClient 
-{ 
-    BaseAddress = new Uri(apiBaseUrl)
-});
-
-// ✅ Configure HttpClient for AIWeatherService (using same backend)
+// HttpClient for AIWeatherService
 builder.Services.AddHttpClient<AIWeatherService>(client =>
 {
-    client.BaseAddress = new Uri(apiBaseUrl);
+    client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
 });
 
-// ✅ Register AIWeatherService
+// Register application services
 builder.Services.AddScoped<AIWeatherService>();
-
-// Add Blazored LocalStorage
-builder.Services.AddBlazoredLocalStorage();
-
-// Register Services
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<WeatherApiService>();
 builder.Services.AddScoped<UserProfileApiService>();
 
+// Local storage
+builder.Services.AddBlazoredLocalStorage();
+
 var host = builder.Build();
 
-// Initialize AuthService
+// Initialize auth state
 var authService = host.Services.GetRequiredService<AuthService>();
 await authService.InitializeAsync();
 

@@ -5,28 +5,31 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Supabase;
-using Microsoft.AspNetCore.Builder;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
+// =====================================================
+// Configuration
+// =====================================================
 builder.Configuration.AddEnvironmentVariables();
 
-// Add Controllers and Swagger
+// =====================================================
+// Services
+// =====================================================
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Register Alert Service
+// Alert & Email
 builder.Services.AddSingleton<IAlertService, AlertService>();
-
-// Register Email Service
 builder.Services.AddScoped<IEmailService, EmailService>();
 
-// Register Background Service
+// Background Service
 builder.Services.AddHostedService<FavoriteWeatherMonitorService>();
 
-// MongoDB Configuration
+// =====================================================
+// MongoDB
+// =====================================================
 var mongoConnectionString =
     Environment.GetEnvironmentVariable("MongoDB__ConnectionString")
     ?? builder.Configuration["MongoDB__ConnectionString"]
@@ -38,15 +41,10 @@ var mongoDatabaseName =
     ?? builder.Configuration["MongoDB__DatabaseName"]
     ?? "WeatherAppDB";
 
-Console.WriteLine($"DEBUG - MongoDB Connection: {(mongoConnectionString.StartsWith("mongodb+srv") ? "Atlas" : "Local")}");
-Console.WriteLine($"DEBUG - MongoDB Database: {mongoDatabaseName}");
-
 builder.Services.AddSingleton<IMongoClient>(_ =>
 {
     var settings = MongoClientSettings.FromConnectionString(mongoConnectionString);
     settings.ServerApi = new ServerApi(ServerApiVersion.V1);
-    settings.RetryWrites = true;
-    settings.RetryReads = true;
     return new MongoClient(settings);
 });
 
@@ -56,17 +54,17 @@ builder.Services.AddSingleton<IMongoDatabase>(sp =>
     return client.GetDatabase(mongoDatabaseName);
 });
 
-// Supabase Configuration
-var supabaseUrl = 
+// =====================================================
+// Supabase
+// =====================================================
+var supabaseUrl =
     Environment.GetEnvironmentVariable("Supabase__Url")
-    ?? builder.Configuration["Supabase__Url"]
-    ?? builder.Configuration["Supabase:Url"] 
+    ?? builder.Configuration["Supabase:Url"]
     ?? throw new Exception("Supabase Url missing");
 
-var supabaseKey = 
+var supabaseKey =
     Environment.GetEnvironmentVariable("Supabase__AnonKey")
-    ?? builder.Configuration["Supabase__AnonKey"]
-    ?? builder.Configuration["Supabase:AnonKey"] 
+    ?? builder.Configuration["Supabase:AnonKey"]
     ?? throw new Exception("Supabase AnonKey missing");
 
 builder.Services.AddSingleton(_ =>
@@ -79,29 +77,30 @@ builder.Services.AddSingleton(_ =>
     return new Supabase.Client(supabaseUrl, supabaseKey, options);
 });
 
-// Register Application Services
+// =====================================================
+// Application Services
+// =====================================================
 builder.Services.AddHttpClient<WeatherService>();
 builder.Services.AddScoped<WeatherService>();
 builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<SupabaseAuthService>();
 
+// =====================================================
 // JWT Authentication
-var jwtSecretKey = 
+// =====================================================
+var jwtSecretKey =
     Environment.GetEnvironmentVariable("Jwt__SecretKey")
-    ?? builder.Configuration["Jwt__SecretKey"]
-    ?? builder.Configuration["Jwt:SecretKey"] 
-    ?? "your-default-secret-key-min-32-chars-long";
+    ?? builder.Configuration["Jwt:SecretKey"]
+    ?? throw new Exception("JWT SecretKey missing");
 
-var jwtIssuer = 
+var jwtIssuer =
     Environment.GetEnvironmentVariable("Jwt__Issuer")
-    ?? builder.Configuration["Jwt__Issuer"]
-    ?? builder.Configuration["Jwt:Issuer"] 
+    ?? builder.Configuration["Jwt:Issuer"]
     ?? "WeatherApp";
 
-var jwtAudience = 
+var jwtAudience =
     Environment.GetEnvironmentVariable("Jwt__Audience")
-    ?? builder.Configuration["Jwt__Audience"]
-    ?? builder.Configuration["Jwt:Audience"] 
+    ?? builder.Configuration["Jwt:Audience"]
     ?? "WeatherAppUsers";
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -115,87 +114,54 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtIssuer,
             ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey))
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSecretKey)
+            )
         };
     });
 
-// ✅ FIXED CORS Configuration - MUST come before builder.Build()
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.SetIsOriginAllowed(_ => true)  // Allow any origin
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
-    });
-});
-
-// BUILD THE APP (only once!)
+// =====================================================
+// Build App
+// =====================================================
 var app = builder.Build();
 
+// =====================================================
 // Startup Logs
+// =====================================================
 Console.WriteLine("===========================================");
-Console.WriteLine($"Weather App API - {app.Environment.EnvironmentName}");
+Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
 Console.WriteLine($"MongoDB: {mongoDatabaseName}");
 Console.WriteLine($"Supabase: {supabaseUrl}");
 Console.WriteLine("===========================================");
 
-// Test MongoDB Connection
-try
-{
-    Console.WriteLine("Testing MongoDB Atlas connection...");
-    Console.WriteLine($"Connection String: {mongoConnectionString}");
-    await MongoConnectionTest.TestConnection(mongoConnectionString);
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"❌ MongoDB test failed: {ex.Message}");
-}
+// =====================================================
+// Middleware Pipeline (ORDER MATTERS)
+// =====================================================
 
-// ✅ Serve Blazor WebAssembly static files (FIRST - before routing)
-//app.UseBlazorFrameworkFiles();
+// Swagger
+app.UseSwagger();
+app.UseSwaggerUI();
+
+// Static files (for swagger / wwwroot assets only)
 app.UseStaticFiles();
 
-// Configure Swagger
-app.UseSwagger();
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Weather App API v1");
-    c.RoutePrefix = "swagger";
-});
-
-// ✅ CRITICAL: CORS must be placed BEFORE authentication and authorization
 app.UseRouting();
-app.UseCors("AllowAll");  // ✅ This MUST come after UseRouting() and before UseAuthentication()
+
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map Controllers
+// Map API controllers
 app.MapControllers();
 
-// API Health Check Endpoint
-app.MapGet("/api", () => Results.Ok(new 
-{ 
-    message = "Weather App API is running!",
-    version = "1.0",
+// Health & debug endpoints
+app.MapGet("/api", () => Results.Ok(new
+{
+    message = "Weather App API is running",
     status = "healthy",
     timestamp = DateTime.UtcNow
 }));
 
-// Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
-
-// Debug: List all registered endpoints
-Console.WriteLine("==================== REGISTERED ENDPOINTS ====================");
-var endpoints = app.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints;
-foreach (var endpoint in endpoints)
-{
-    Console.WriteLine($"  {endpoint.DisplayName}");
-}
-Console.WriteLine("==============================================================");
-
-// ✅ Fallback to index.html for client-side routing (MUST BE LAST!)
-//app.MapFallbackToFile("index.html");
+app.MapGet("/health", () => Results.Ok("OK"));
 
 app.Run();
+
