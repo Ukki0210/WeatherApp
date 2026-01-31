@@ -1,34 +1,52 @@
+# ==========================================
+# Dockerfile for WeatherApp.Client (Frontend Only)
+# ==========================================
+
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy csproj files and restore dependencies
-COPY ["WeatherApp.Server/WeatherApp.Server.csproj", "WeatherApp.Server/"]
+# Copy solution file if exists (optional, helps with restore)
+COPY ["WeatherApp.sln", "./"]
+
+# Copy project files for restore
 COPY ["WeatherApp.Client/WeatherApp.Client.csproj", "WeatherApp.Client/"]
 COPY ["WeatherApp.Shared/WeatherApp.Shared.csproj", "WeatherApp.Shared/"]
 
-RUN dotnet restore "WeatherApp.Server/WeatherApp.Server.csproj"
+# Restore dependencies
+RUN dotnet restore "WeatherApp.Client/WeatherApp.Client.csproj"
 
-# Copy everything else
+# Copy all source code
 COPY . .
 
-# Build and publish the server project
-WORKDIR "/src/WeatherApp.Server"
-RUN dotnet publish "WeatherApp.Server.csproj" -c Release -o /app/publish
+# Build and publish the CLIENT project (not Server!)
+WORKDIR "/src/WeatherApp.Client"
+RUN dotnet publish "WeatherApp.Client.csproj" -c Release -o /app/publish
 
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
-WORKDIR /app
+# Verify the publish output
+RUN ls -la /app/publish
+RUN ls -la /app/publish/wwwroot
 
-# Copy published output from build stage
-COPY --from=build /app/publish .
+# ==========================================
+# Runtime stage - Nginx to serve static files
+# ==========================================
+FROM nginx:alpine
+WORKDIR /usr/share/nginx/html
 
-# Expose port 8080 (Render's default)
+# Remove default nginx static assets
+RUN rm -rf ./*
+
+# Copy published Blazor WASM files from build stage
+COPY --from=build /app/publish/wwwroot .
+
+# Verify files were copied
+RUN ls -la /usr/share/nginx/html
+
+# Copy custom nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Expose port 8080 (Render uses this port)
 EXPOSE 8080
 
-# Set the port environment variable
-ENV ASPNETCORE_URLS=http://+:8080
-ENV ASPNETCORE_ENVIRONMENT=Production
-
-# Run the application
-ENTRYPOINT ["dotnet", "WeatherApp.Server.dll"]
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

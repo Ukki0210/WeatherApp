@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Supabase;
+using Microsoft.AspNetCore.Builder;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -151,7 +153,7 @@ catch (Exception ex)
 }
 
 // ✅ Serve Blazor WebAssembly static files (FIRST - before routing)
-app.UseBlazorFrameworkFiles();
+//app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
 
 // Configure Swagger
@@ -193,6 +195,6 @@ foreach (var endpoint in endpoints)
 Console.WriteLine("==============================================================");
 
 // ✅ Fallback to index.html for client-side routing (MUST BE LAST!)
-app.MapFallbackToFile("index.html");
+//app.MapFallbackToFile("index.html");
 
 app.Run();
