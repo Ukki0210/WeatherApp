@@ -119,14 +119,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// CORS Configuration
+// ✅ FIXED CORS Configuration - MUST come before builder.Build()
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.SetIsOriginAllowed(_ => true)  // Allow any origin
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
@@ -164,9 +165,9 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
-// Configure Middleware Pipeline
+// ✅ CRITICAL: CORS must be placed BEFORE authentication and authorization
 app.UseRouting();
-app.UseCors("AllowAll");
+app.UseCors("AllowAll");  // ✅ This MUST come after UseRouting() and before UseAuthentication()
 app.UseAuthentication();
 app.UseAuthorization();
 
