@@ -1,107 +1,65 @@
-using MongoDB.Driver;
-using WeatherApp.Server.Services;
-using WeatherApp.Server;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Supabase;
+using WeatherApp.Server.Services;
+using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// =====================================================
-// Configuration
-// =====================================================
-builder.Configuration.AddEnvironmentVariables();
-
-// =====================================================
-// Services
-// =====================================================
+// Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Alert & Email
-builder.Services.AddSingleton<IAlertService, AlertService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
-
-// Background Service
-builder.Services.AddHostedService<FavoriteWeatherMonitorService>();
-
-// =====================================================
-// MongoDB
-// =====================================================
-var mongoConnectionString =
-    Environment.GetEnvironmentVariable("MongoDB__ConnectionString")
-    ?? builder.Configuration["MongoDB__ConnectionString"]
-    ?? builder.Configuration.GetConnectionString("MongoDB")
-    ?? throw new Exception("MongoDB connection string not found");
-
-var mongoDatabaseName =
-    Environment.GetEnvironmentVariable("MongoDB__DatabaseName")
-    ?? builder.Configuration["MongoDB__DatabaseName"]
-    ?? "WeatherAppDB";
-
-builder.Services.AddSingleton<IMongoClient>(_ =>
+// ✅ CORS Configuration - Allow your frontend domain
+builder.Services.AddCors(options =>
 {
-    var settings = MongoClientSettings.FromConnectionString(mongoConnectionString);
-    settings.ServerApi = new ServerApi(ServerApiVersion.V1);
-    return new MongoClient(settings);
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        // Get frontend URL from environment variable or configuration
+        var frontendUrl = builder.Configuration["Frontend:Url"] 
+            ?? "https://weatherapp-6i2i.onrender.com"; // Your actual frontend URL
+        
+        policy.WithOrigins(
+                frontendUrl,
+                "http://localhost:5000", // For local development
+                "https://localhost:5001"  // For local development
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
+    });
 });
 
-builder.Services.AddSingleton<IMongoDatabase>(sp =>
+// MongoDB Configuration
+var mongoConnectionString = builder.Configuration.GetConnectionString("MongoDB")
+    ?? throw new Exception("MongoDB connection string not configured");
+
+builder.Services.AddSingleton<IMongoClient>(sp =>
+{
+    return new MongoClient(mongoConnectionString);
+});
+
+builder.Services.AddScoped(sp =>
 {
     var client = sp.GetRequiredService<IMongoClient>();
-    return client.GetDatabase(mongoDatabaseName);
+    var databaseName = builder.Configuration["MongoDatabase:DatabaseName"] ?? "WeatherAppDB";
+    return client.GetDatabase(databaseName);
 });
 
-// =====================================================
-// Supabase
-// =====================================================
-var supabaseUrl =
-    Environment.GetEnvironmentVariable("Supabase__Url")
-    ?? builder.Configuration["Supabase:Url"]
-    ?? throw new Exception("Supabase Url missing");
-
-var supabaseKey =
-    Environment.GetEnvironmentVariable("Supabase__AnonKey")
-    ?? builder.Configuration["Supabase:AnonKey"]
-    ?? throw new Exception("Supabase AnonKey missing");
-
-builder.Services.AddSingleton(_ =>
-{
-    var options = new SupabaseOptions
-    {
-        AutoRefreshToken = true,
-        AutoConnectRealtime = false
-    };
-    return new Supabase.Client(supabaseUrl, supabaseKey, options);
-});
-
-// =====================================================
-// Application Services
-// =====================================================
+// Register services
 builder.Services.AddHttpClient<WeatherService>();
 builder.Services.AddScoped<WeatherService>();
+builder.Services.AddScoped<EmailService>();
+//builder.Services.AddScoped<WeatherAlert>();
+builder.Services.AddScoped<AlertService>();
+builder.Services.AddScoped<FavoriteWeatherMonitorService>();
 builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<SupabaseAuthService>();
 
-// =====================================================
 // JWT Authentication
-// =====================================================
-var jwtSecretKey =
-    Environment.GetEnvironmentVariable("Jwt__SecretKey")
-    ?? builder.Configuration["Jwt:SecretKey"]
-    ?? throw new Exception("JWT SecretKey missing");
-
-var jwtIssuer =
-    Environment.GetEnvironmentVariable("Jwt__Issuer")
-    ?? builder.Configuration["Jwt:Issuer"]
-    ?? "WeatherApp";
-
-var jwtAudience =
-    Environment.GetEnvironmentVariable("Jwt__Audience")
-    ?? builder.Configuration["Jwt:Audience"]
-    ?? "WeatherAppUsers";
+var jwtKey = builder.Configuration["Supabase:AnonKey"]
+    ?? throw new Exception("JWT key not configured");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -112,56 +70,44 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtSecretKey)
-            )
+            ValidIssuer = builder.Configuration["Supabase:Url"],
+            ValidAudience = "authenticated",
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
     });
 
-// =====================================================
-// Build App
-// =====================================================
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
-// =====================================================
-// Startup Logs
-// =====================================================
-Console.WriteLine("===========================================");
-Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
-Console.WriteLine($"MongoDB: {mongoDatabaseName}");
-Console.WriteLine($"Supabase: {supabaseUrl}");
-Console.WriteLine("===========================================");
+// Configure the HTTP request pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    // ❌ REMOVED: UseWebAssemblyDebugging() - Not needed for separate deployments
+}
+else
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
 
-// =====================================================
-// Middleware Pipeline (ORDER MATTERS)
-// =====================================================
+app.UseHttpsRedirection();
 
-// Swagger
-app.UseSwagger();
-app.UseSwaggerUI();
+// ✅ IMPORTANT: Enable CORS before routing
+app.UseCors("AllowFrontend");
 
-// Static files (for swagger / wwwroot assets only)
-app.UseStaticFiles();
-
-app.UseRouting();
+// ❌ REMOVED: UseStaticFiles and UseBlazorFrameworkFiles - Not needed for API-only backend
+// app.UseStaticFiles();
+// app.UseBlazorFrameworkFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map API controllers
 app.MapControllers();
 
-// Health & debug endpoints
-app.MapGet("/api", () => Results.Ok(new
-{
-    message = "Weather App API is running",
-    status = "healthy",
-    timestamp = DateTime.UtcNow
-}));
-
-app.MapGet("/health", () => Results.Ok("OK"));
+// ❌ REMOVED: MapFallbackToFile - Not needed for API-only backend
+// app.MapFallbackToFile("index.html");
 
 app.Run();
-
