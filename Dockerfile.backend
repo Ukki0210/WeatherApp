@@ -1,0 +1,47 @@
+# ==========================================
+# Dockerfile for WeatherApp.Server (Backend API)
+# ==========================================
+
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy solution file
+COPY ["WeatherApp.sln", "./"]
+
+# Copy project files for restore
+COPY ["WeatherApp.Server/WeatherApp.Server.csproj", "WeatherApp.Server/"]
+COPY ["WeatherApp.Shared/WeatherApp.Shared.csproj", "WeatherApp.Shared/"]
+
+# Restore dependencies
+RUN dotnet restore "WeatherApp.Server/WeatherApp.Server.csproj"
+
+# Copy all source code
+COPY . .
+
+# Build and publish the SERVER project
+WORKDIR "/src/WeatherApp.Server"
+RUN dotnet publish "WeatherApp.Server.csproj" -c Release -o /app/publish
+
+# Verify the publish output
+RUN ls -la /app/publish
+
+# ==========================================
+# Runtime stage
+# ==========================================
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+
+# Copy published files from build stage
+COPY --from=build /app/publish .
+
+# Render uses port 10000 for web services
+# But we'll use 8080 which is more standard
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+# Expose port
+EXPOSE 8080
+
+# Start the application
+ENTRYPOINT ["dotnet", "WeatherApp.Server.dll"]
