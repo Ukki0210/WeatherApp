@@ -1534,22 +1534,41 @@
         }
     }
 
-    private void UpdateVideoBackground()
+     private void UpdateVideoBackground()
     {
         var icon = currentWeatherCondition.ToLower();
 
+        // Map OpenWeatherMap icons to your available videos:
+        // Available: sunny.mp4, cloudy.mp4, rain.mp4, snowy.mp4, fog.mp4, night-clear.mp4
+        
         currentVideoPath = icon switch
         {
-            "01d" or "01n" => "videos/sunny.mp4",
+            // Clear sky - day
+            "01d" => "videos/sunny.mp4",
+            
+            // Clear sky - night
+            "01n" => "videos/night-clear.mp4",
+            
+            // Any clouds (few, scattered, broken, overcast)
             "02d" or "02n" or "03d" or "03n" or "04d" or "04n" => "videos/cloudy.mp4",
+            
+            // Rain, drizzle, shower
             "09d" or "09n" or "10d" or "10n" => "videos/rain.mp4",
-            "11d" or "11n" => "videos/stormy.mp4",
+            
+            // Thunderstorm (use rain video since you don't have stormy)
+            "11d" or "11n" => "videos/rain.mp4",
+            
+            // Snow
             "13d" or "13n" => "videos/snowy.mp4",
-            "50d" or "50n" => "videos/foggy.mp4",
+            
+            // Mist, fog, haze
+            "50d" or "50n" => "videos/fog.mp4",
+            
+            // Default fallback
             _ => "videos/sunny.mp4"
         };
 
-        videoKey++;
+        videoKey++; // Force video reload
     }
 
     private async Task LoadTopCities()

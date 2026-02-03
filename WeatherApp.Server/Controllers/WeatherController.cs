@@ -358,6 +358,7 @@ namespace WeatherApp.Server.Controllers
         }
 
         // ✅ NEW: Helper method to derive weather icon from description
+        // Maps to available videos: sunny, cloudy, rain, snowy, fog, night-clear
         private string DeriveIconFromDescription(string description)
         {
             if (string.IsNullOrEmpty(description))
@@ -365,45 +366,33 @@ namespace WeatherApp.Server.Controllers
 
             description = description.ToLower();
 
-            // Clear sky
-            if (description.Contains("clear"))
-                return "01d";
+            // Clear sky - DAY
+            if (description.Contains("clear") && !description.Contains("night"))
+                return "01d"; // → sunny.mp4
             
-            // Few clouds
-            else if (description.Contains("few clouds"))
-                return "02d";
+            // Clear sky - NIGHT
+            else if (description.Contains("clear") && description.Contains("night"))
+                return "01n"; // → night-clear.mp4
             
-            // Scattered clouds
-            else if (description.Contains("scattered clouds"))
-                return "03d";
+            // Any type of clouds (few, scattered, broken, overcast)
+            else if (description.Contains("cloud"))
+                return "02d"; // → cloudy.mp4
             
-            // Broken/overcast clouds
-            else if (description.Contains("broken clouds") || description.Contains("overcast"))
-                return "04d";
+            // Rain, drizzle, or shower
+            else if (description.Contains("rain") || description.Contains("drizzle") || description.Contains("shower"))
+                return "10d"; // → rain.mp4
             
-            // Shower/drizzle rain
-            else if (description.Contains("shower") || description.Contains("drizzle"))
-                return "09d";
-            
-            // Rain
-            else if (description.Contains("rain"))
-                return "10d";
-            
-            // Thunderstorm
+            // Thunderstorm (still use rain video since you don't have stormy.mp4)
             else if (description.Contains("thunderstorm") || description.Contains("storm"))
-                return "11d";
+                return "11d"; // → rain.mp4 (will map to rain)
             
             // Snow
             else if (description.Contains("snow"))
-                return "13d";
+                return "13d"; // → snowy.mp4
             
-            // Mist/Fog/Haze
+            // Mist/Fog/Haze/Smoke
             else if (description.Contains("mist") || description.Contains("fog") || description.Contains("haze") || description.Contains("smoke"))
-                return "50d";
-            
-            // Cloudy (general)
-            else if (description.Contains("cloud"))
-                return "02d";
+                return "50d"; // → fog.mp4
             
             // Default to sunny
             return "01d";
