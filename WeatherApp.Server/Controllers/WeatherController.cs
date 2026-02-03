@@ -88,43 +88,65 @@ namespace WeatherApp.Server.Controllers
         }
 
         // ✅ GET /api/weather/coordinates?lat=...&lon=...
-        [HttpGet("coordinates")]
-        public async Task<IActionResult> GetWeatherByCoordinates(
-            [FromQuery] double lat, 
-            [FromQuery] double lon, 
-            [FromQuery] string? userId = null)
+        // ✅ GET /api/weather/coordinates?lat=...&lon=...
+[HttpGet("coordinates")]
+public async Task<IActionResult> GetWeatherByCoordinates(
+    [FromQuery] double lat, 
+    [FromQuery] double lon, 
+    [FromQuery] string? userId = null)
+{
+    try
+    {
+        _logger.LogInformation("Fetching weather for coordinates: {Lat}, {Lon}", lat, lon);
+
+        var weatherObj = await _weatherService.GetWeatherByCoordinatesAsync(lat, lon);
+        
+        if (weatherObj == null)
         {
-            try
+            return NotFound(new ApiResponse<SharedWeatherData>
             {
-                _logger.LogInformation("Fetching weather for coordinates: {Lat}, {Lon}", lat, lon);
-
-                // For now, return a placeholder
-                // You would need to add a method in WeatherService to handle coordinates
-                var weatherData = new SharedWeatherData
-                {
-                    City = $"Location ({lat}, {lon})",
-                    Latitude = lat,
-                    Longitude = lon,
-                    Timestamp = DateTime.UtcNow
-                };
-
-                return Ok(new ApiResponse<SharedWeatherData>
-                {
-                    Success = true,
-                    Data = weatherData,
-                    Message = "Coordinates endpoint - implementation pending"
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error fetching weather by coordinates");
-                return StatusCode(500, new ApiResponse<SharedWeatherData>
-                {
-                    Success = false,
-                    Message = "Failed to fetch weather"
-                });
-            }
+                Success = false,
+                Message = $"Weather not found for coordinates ({lat}, {lon})"
+            });
         }
+
+        // Convert dynamic object to WeatherData
+        var weatherData = new SharedWeatherData
+        {
+            City = weatherObj.GetType().GetProperty("city")?.GetValue(weatherObj)?.ToString() ?? "Unknown",
+            Country = weatherObj.GetType().GetProperty("country")?.GetValue(weatherObj)?.ToString() ?? "",
+            Temperature = Convert.ToDouble(weatherObj.GetType().GetProperty("temperature")?.GetValue(weatherObj) ?? 0),
+            FeelsLike = Convert.ToDouble(weatherObj.GetType().GetProperty("feelsLike")?.GetValue(weatherObj) ?? 0),
+            Description = weatherObj.GetType().GetProperty("description")?.GetValue(weatherObj)?.ToString() ?? "",
+            Icon = weatherObj.GetType().GetProperty("icon")?.GetValue(weatherObj)?.ToString() ?? "01d",
+            Humidity = Convert.ToInt32(weatherObj.GetType().GetProperty("humidity")?.GetValue(weatherObj) ?? 0),
+            WindSpeed = Convert.ToDouble(weatherObj.GetType().GetProperty("windSpeed")?.GetValue(weatherObj) ?? 0),
+            Pressure = Convert.ToInt32(weatherObj.GetType().GetProperty("pressure")?.GetValue(weatherObj) ?? 0),
+            Clouds = Convert.ToInt32(weatherObj.GetType().GetProperty("clouds")?.GetValue(weatherObj) ?? 0),
+            Visibility = Convert.ToInt32(weatherObj.GetType().GetProperty("visibility")?.GetValue(weatherObj) ?? 10000),
+            Timestamp = Convert.ToDateTime(weatherObj.GetType().GetProperty("timestamp")?.GetValue(weatherObj) ?? DateTime.UtcNow),
+            Latitude = lat,
+            Longitude = lon,
+            UserId = userId
+        };
+
+        return Ok(new ApiResponse<SharedWeatherData>
+        {
+            Success = true,
+            Data = weatherData,
+            Message = "Weather fetched successfully"
+        });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error fetching weather by coordinates");
+        return StatusCode(500, new ApiResponse<SharedWeatherData>
+        {
+            Success = false,
+            Message = "Failed to fetch weather"
+        });
+    }
+}
 
         // ✅ GET /api/weather/forecast/{city}
         [HttpGet("forecast/{city}")]
