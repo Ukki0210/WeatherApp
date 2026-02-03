@@ -44,6 +44,7 @@ namespace WeatherApp.Server.Services
                     temperature = weatherData.GetProperty("main").GetProperty("temp").GetDouble(),
                     feelsLike = weatherData.GetProperty("main").GetProperty("feels_like").GetDouble(),
                     description = weatherData.GetProperty("weather")[0].GetProperty("description").GetString(),
+                    icon = weatherData.GetProperty("weather")[0].GetProperty("icon").GetString(), // ✅ ADDED
                     humidity = weatherData.GetProperty("main").GetProperty("humidity").GetInt32(),
                     pressure = weatherData.GetProperty("main").GetProperty("pressure").GetInt32(),
                     windSpeed = weatherData.GetProperty("wind").GetProperty("speed").GetDouble(),
@@ -55,6 +56,48 @@ namespace WeatherApp.Server.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching weather for {City}", city);
+                throw;
+            }
+        }
+
+        // ✅ NEW METHOD - Get weather by coordinates
+        public async Task<object?> GetWeatherByCoordinatesAsync(double lat, double lon)
+        {
+            try
+            {
+                var url = $"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={_apiKey}&units=metric";
+                
+                var response = await _httpClient.GetAsync(url);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("OpenWeatherMap API returned {StatusCode} for coordinates ({Lat}, {Lon})", 
+                        response.StatusCode, lat, lon);
+                    return null;
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                var weatherData = JsonSerializer.Deserialize<JsonElement>(content);
+
+                return new
+                {
+                    city = weatherData.GetProperty("name").GetString(), // ✅ This will be the city name like "Bangalore"
+                    country = weatherData.GetProperty("sys").GetProperty("country").GetString(),
+                    temperature = weatherData.GetProperty("main").GetProperty("temp").GetDouble(),
+                    feelsLike = weatherData.GetProperty("main").GetProperty("feels_like").GetDouble(),
+                    description = weatherData.GetProperty("weather")[0].GetProperty("description").GetString(),
+                    icon = weatherData.GetProperty("weather")[0].GetProperty("icon").GetString(), // ✅ ADDED
+                    humidity = weatherData.GetProperty("main").GetProperty("humidity").GetInt32(),
+                    pressure = weatherData.GetProperty("main").GetProperty("pressure").GetInt32(),
+                    windSpeed = weatherData.GetProperty("wind").GetProperty("speed").GetDouble(),
+                    clouds = weatherData.GetProperty("clouds").GetProperty("all").GetInt32(),
+                    visibility = weatherData.TryGetProperty("visibility", out var vis) ? vis.GetInt32() : 10000,
+                    timestamp = DateTimeOffset.FromUnixTimeSeconds(weatherData.GetProperty("dt").GetInt64()).DateTime
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching weather for coordinates ({Lat}, {Lon})", lat, lon);
                 throw;
             }
         }
@@ -82,9 +125,10 @@ namespace WeatherApp.Server.Services
                     Temperature = weatherData.GetProperty("main").GetProperty("temp").GetDouble(),
                     FeelsLike = weatherData.GetProperty("main").GetProperty("feels_like").GetDouble(),
                     Description = weatherData.GetProperty("weather")[0].GetProperty("description").GetString() ?? "",
+                    Icon = weatherData.GetProperty("weather")[0].GetProperty("icon").GetString() ?? "01d", // ✅ ADDED
                     Humidity = weatherData.GetProperty("main").GetProperty("humidity").GetInt32(),
                     WindSpeed = weatherData.GetProperty("wind").GetProperty("speed").GetDouble(),
-                    Visibility = weatherData.TryGetProperty("visibility", out var vis) ? vis.GetInt32() : 10000, // ✅ ADDED
+                    Visibility = weatherData.TryGetProperty("visibility", out var vis) ? vis.GetInt32() : 10000,
                     Timestamp = DateTime.UtcNow
                 };
             }
@@ -126,6 +170,7 @@ namespace WeatherApp.Server.Services
                             tempMin = item.GetProperty("main").GetProperty("temp_min").GetDouble(),
                             tempMax = item.GetProperty("main").GetProperty("temp_max").GetDouble(),
                             description = item.GetProperty("weather")[0].GetProperty("description").GetString(),
+                            icon = item.GetProperty("weather")[0].GetProperty("icon").GetString(), // ✅ ADDED
                             humidity = item.GetProperty("main").GetProperty("humidity").GetInt32(),
                             windSpeed = item.GetProperty("wind").GetProperty("speed").GetDouble(),
                             clouds = item.GetProperty("clouds").GetProperty("all").GetInt32(),
@@ -149,16 +194,17 @@ namespace WeatherApp.Server.Services
         }
     }
 
-    // ✅ UPDATED - Added Visibility property
+    // ✅ UPDATED - Added Icon property
     public class WeatherData
     {
         public string City { get; set; } = string.Empty;
         public double Temperature { get; set; }
         public double FeelsLike { get; set; }
         public string Description { get; set; } = string.Empty;
+        public string Icon { get; set; } = "01d"; // ✅ ADDED - Weather icon code (e.g., "01d", "10n")
         public int Humidity { get; set; }
         public double WindSpeed { get; set; }
-        public int Visibility { get; set; } = 10000; // ✅ ADDED - Visibility in meters, default 10km
+        public int Visibility { get; set; } = 10000;
         public DateTime Timestamp { get; set; }
     }
 }
