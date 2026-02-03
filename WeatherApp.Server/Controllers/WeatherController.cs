@@ -53,20 +53,24 @@ namespace WeatherApp.Server.Controllers
                 }
 
                 // Convert dynamic object to WeatherData
+                var description = weatherObj.GetType().GetProperty("description")?.GetValue(weatherObj)?.ToString() ?? "";
+                
                 var weatherData = new SharedWeatherData
                 {
                     City = weatherObj.GetType().GetProperty("city")?.GetValue(weatherObj)?.ToString() ?? city,
                     Country = weatherObj.GetType().GetProperty("country")?.GetValue(weatherObj)?.ToString() ?? "",
                     Temperature = Convert.ToDouble(weatherObj.GetType().GetProperty("temperature")?.GetValue(weatherObj) ?? 0),
                     FeelsLike = Convert.ToDouble(weatherObj.GetType().GetProperty("feelsLike")?.GetValue(weatherObj) ?? 0),
-                    Description = weatherObj.GetType().GetProperty("description")?.GetValue(weatherObj)?.ToString() ?? "",
+                    Description = description,
                     Humidity = Convert.ToInt32(weatherObj.GetType().GetProperty("humidity")?.GetValue(weatherObj) ?? 0),
                     WindSpeed = Convert.ToDouble(weatherObj.GetType().GetProperty("windSpeed")?.GetValue(weatherObj) ?? 0),
                     Pressure = Convert.ToInt32(weatherObj.GetType().GetProperty("pressure")?.GetValue(weatherObj) ?? 0),
                     Clouds = Convert.ToInt32(weatherObj.GetType().GetProperty("clouds")?.GetValue(weatherObj) ?? 0),
                     Visibility = Convert.ToInt32(weatherObj.GetType().GetProperty("visibility")?.GetValue(weatherObj) ?? 10000),
                     Timestamp = Convert.ToDateTime(weatherObj.GetType().GetProperty("timestamp")?.GetValue(weatherObj) ?? DateTime.UtcNow),
-                    UserId = userId
+                    UserId = userId,
+                    // ✅ FIX: Extract icon from weather data or derive from description
+                    Icon = DeriveIconFromDescription(description)
                 };
 
                 return Ok(new ApiResponse<SharedWeatherData>
@@ -88,65 +92,66 @@ namespace WeatherApp.Server.Controllers
         }
 
         // ✅ GET /api/weather/coordinates?lat=...&lon=...
-        // ✅ GET /api/weather/coordinates?lat=...&lon=...
-[HttpGet("coordinates")]
-public async Task<IActionResult> GetWeatherByCoordinates(
-    [FromQuery] double lat, 
-    [FromQuery] double lon, 
-    [FromQuery] string? userId = null)
-{
-    try
-    {
-        _logger.LogInformation("Fetching weather for coordinates: {Lat}, {Lon}", lat, lon);
-
-        var weatherObj = await _weatherService.GetWeatherByCoordinatesAsync(lat, lon);
-        
-        if (weatherObj == null)
+        [HttpGet("coordinates")]
+        public async Task<IActionResult> GetWeatherByCoordinates(
+            [FromQuery] double lat, 
+            [FromQuery] double lon, 
+            [FromQuery] string? userId = null)
         {
-            return NotFound(new ApiResponse<SharedWeatherData>
+            try
             {
-                Success = false,
-                Message = $"Weather not found for coordinates ({lat}, {lon})"
-            });
+                _logger.LogInformation("Fetching weather for coordinates: {Lat}, {Lon}", lat, lon);
+
+                var weatherObj = await _weatherService.GetWeatherByCoordinatesAsync(lat, lon);
+                
+                if (weatherObj == null)
+                {
+                    return NotFound(new ApiResponse<SharedWeatherData>
+                    {
+                        Success = false,
+                        Message = $"Weather not found for coordinates ({lat}, {lon})"
+                    });
+                }
+
+                // Convert dynamic object to WeatherData
+                var description = weatherObj.GetType().GetProperty("description")?.GetValue(weatherObj)?.ToString() ?? "";
+                
+                var weatherData = new SharedWeatherData
+                {
+                    City = weatherObj.GetType().GetProperty("city")?.GetValue(weatherObj)?.ToString() ?? "Unknown",
+                    Country = weatherObj.GetType().GetProperty("country")?.GetValue(weatherObj)?.ToString() ?? "",
+                    Temperature = Convert.ToDouble(weatherObj.GetType().GetProperty("temperature")?.GetValue(weatherObj) ?? 0),
+                    FeelsLike = Convert.ToDouble(weatherObj.GetType().GetProperty("feelsLike")?.GetValue(weatherObj) ?? 0),
+                    Description = description,
+                    Icon = DeriveIconFromDescription(description),
+                    Humidity = Convert.ToInt32(weatherObj.GetType().GetProperty("humidity")?.GetValue(weatherObj) ?? 0),
+                    WindSpeed = Convert.ToDouble(weatherObj.GetType().GetProperty("windSpeed")?.GetValue(weatherObj) ?? 0),
+                    Pressure = Convert.ToInt32(weatherObj.GetType().GetProperty("pressure")?.GetValue(weatherObj) ?? 0),
+                    Clouds = Convert.ToInt32(weatherObj.GetType().GetProperty("clouds")?.GetValue(weatherObj) ?? 0),
+                    Visibility = Convert.ToInt32(weatherObj.GetType().GetProperty("visibility")?.GetValue(weatherObj) ?? 10000),
+                    Timestamp = Convert.ToDateTime(weatherObj.GetType().GetProperty("timestamp")?.GetValue(weatherObj) ?? DateTime.UtcNow),
+                    Latitude = lat,
+                    Longitude = lon,
+                    UserId = userId
+                };
+
+                return Ok(new ApiResponse<SharedWeatherData>
+                {
+                    Success = true,
+                    Data = weatherData,
+                    Message = "Weather fetched successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching weather by coordinates");
+                return StatusCode(500, new ApiResponse<SharedWeatherData>
+                {
+                    Success = false,
+                    Message = "Failed to fetch weather"
+                });
+            }
         }
-
-        // Convert dynamic object to WeatherData
-        var weatherData = new SharedWeatherData
-        {
-            City = weatherObj.GetType().GetProperty("city")?.GetValue(weatherObj)?.ToString() ?? "Unknown",
-            Country = weatherObj.GetType().GetProperty("country")?.GetValue(weatherObj)?.ToString() ?? "",
-            Temperature = Convert.ToDouble(weatherObj.GetType().GetProperty("temperature")?.GetValue(weatherObj) ?? 0),
-            FeelsLike = Convert.ToDouble(weatherObj.GetType().GetProperty("feelsLike")?.GetValue(weatherObj) ?? 0),
-            Description = weatherObj.GetType().GetProperty("description")?.GetValue(weatherObj)?.ToString() ?? "",
-            Icon = weatherObj.GetType().GetProperty("icon")?.GetValue(weatherObj)?.ToString() ?? "01d",
-            Humidity = Convert.ToInt32(weatherObj.GetType().GetProperty("humidity")?.GetValue(weatherObj) ?? 0),
-            WindSpeed = Convert.ToDouble(weatherObj.GetType().GetProperty("windSpeed")?.GetValue(weatherObj) ?? 0),
-            Pressure = Convert.ToInt32(weatherObj.GetType().GetProperty("pressure")?.GetValue(weatherObj) ?? 0),
-            Clouds = Convert.ToInt32(weatherObj.GetType().GetProperty("clouds")?.GetValue(weatherObj) ?? 0),
-            Visibility = Convert.ToInt32(weatherObj.GetType().GetProperty("visibility")?.GetValue(weatherObj) ?? 10000),
-            Timestamp = Convert.ToDateTime(weatherObj.GetType().GetProperty("timestamp")?.GetValue(weatherObj) ?? DateTime.UtcNow),
-            Latitude = lat,
-            Longitude = lon,
-            UserId = userId
-        };
-
-        return Ok(new ApiResponse<SharedWeatherData>
-        {
-            Success = true,
-            Data = weatherData,
-            Message = "Weather fetched successfully"
-        });
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error fetching weather by coordinates");
-        return StatusCode(500, new ApiResponse<SharedWeatherData>
-        {
-            Success = false,
-            Message = "Failed to fetch weather"
-        });
-    }
-}
 
         // ✅ GET /api/weather/forecast/{city}
         [HttpGet("forecast/{city}")]
@@ -191,6 +196,8 @@ public async Task<IActionResult> GetWeatherByCoordinates(
                 {
                     foreach (var item in forecasts)
                     {
+                        var description = item.GetType().GetProperty("description")?.GetValue(item)?.ToString() ?? "";
+                        
                         var forecastItem = new ForecastItem
                         {
                             DateTime = Convert.ToDateTime(item.GetType().GetProperty("dateTime")?.GetValue(item) ?? DateTime.UtcNow),
@@ -198,10 +205,11 @@ public async Task<IActionResult> GetWeatherByCoordinates(
                             FeelsLike = Convert.ToDouble(item.GetType().GetProperty("feelsLike")?.GetValue(item) ?? 0),
                             TempMin = Convert.ToDouble(item.GetType().GetProperty("tempMin")?.GetValue(item) ?? 0),
                             TempMax = Convert.ToDouble(item.GetType().GetProperty("tempMax")?.GetValue(item) ?? 0),
-                            Description = item.GetType().GetProperty("description")?.GetValue(item)?.ToString() ?? "",
+                            Description = description,
                             Humidity = Convert.ToInt32(item.GetType().GetProperty("humidity")?.GetValue(item) ?? 0),
                             WindSpeed = Convert.ToDouble(item.GetType().GetProperty("windSpeed")?.GetValue(item) ?? 0),
-                            Clouds = Convert.ToInt32(item.GetType().GetProperty("clouds")?.GetValue(item) ?? 0)
+                            Clouds = Convert.ToInt32(item.GetType().GetProperty("clouds")?.GetValue(item) ?? 0),
+                            Icon = DeriveIconFromDescription(description)
                         };
                         forecastData.Forecasts.Add(forecastItem);
                     }
@@ -225,7 +233,7 @@ public async Task<IActionResult> GetWeatherByCoordinates(
             }
         }
 
-        // ✅ GET /api/weather/top-cities - THIS WAS MISSING!
+        // ✅ GET /api/weather/top-cities - FIXED WITH ICON SUPPORT
         [HttpGet("top-cities")]
         public async Task<IActionResult> GetTopCities()
         {
@@ -250,13 +258,16 @@ public async Task<IActionResult> GetWeatherByCoordinates(
                         var weatherObj = await _weatherService.GetCurrentWeatherAsync(cityName);
                         if (weatherObj != null)
                         {
+                            var description = weatherObj.GetType().GetProperty("description")?.GetValue(weatherObj)?.ToString() ?? "";
+                            
                             var topCity = new TopCity
                             {
                                 Name = weatherObj.GetType().GetProperty("city")?.GetValue(weatherObj)?.ToString() ?? cityName,
                                 Country = weatherObj.GetType().GetProperty("country")?.GetValue(weatherObj)?.ToString() ?? "",
                                 Temperature = Convert.ToDouble(weatherObj.GetType().GetProperty("temperature")?.GetValue(weatherObj) ?? 0),
-                                Description = weatherObj.GetType().GetProperty("description")?.GetValue(weatherObj)?.ToString() ?? "",
-                                Icon = "" // OpenWeatherMap icon can be added here if needed
+                                Description = description,
+                                // ✅ FIX: Now derives icon from weather description
+                                Icon = DeriveIconFromDescription(description)
                             };
                             topCities.Add(topCity);
                         }
@@ -270,7 +281,8 @@ public async Task<IActionResult> GetWeatherByCoordinates(
                             Name = cityName,
                             Country = "",
                             Temperature = 0,
-                            Description = "Data unavailable"
+                            Description = "Data unavailable",
+                            Icon = "01d" // default sunny
                         });
                     }
                 }
@@ -343,6 +355,58 @@ public async Task<IActionResult> GetWeatherByCoordinates(
                     "GET /api/weather/test"
                 }
             });
+        }
+
+        // ✅ NEW: Helper method to derive weather icon from description
+        private string DeriveIconFromDescription(string description)
+        {
+            if (string.IsNullOrEmpty(description))
+                return "01d"; // default sunny
+
+            description = description.ToLower();
+
+            // Clear sky
+            if (description.Contains("clear"))
+                return "01d";
+            
+            // Few clouds
+            else if (description.Contains("few clouds"))
+                return "02d";
+            
+            // Scattered clouds
+            else if (description.Contains("scattered clouds"))
+                return "03d";
+            
+            // Broken/overcast clouds
+            else if (description.Contains("broken clouds") || description.Contains("overcast"))
+                return "04d";
+            
+            // Shower/drizzle rain
+            else if (description.Contains("shower") || description.Contains("drizzle"))
+                return "09d";
+            
+            // Rain
+            else if (description.Contains("rain"))
+                return "10d";
+            
+            // Thunderstorm
+            else if (description.Contains("thunderstorm") || description.Contains("storm"))
+                return "11d";
+            
+            // Snow
+            else if (description.Contains("snow"))
+                return "13d";
+            
+            // Mist/Fog/Haze
+            else if (description.Contains("mist") || description.Contains("fog") || description.Contains("haze") || description.Contains("smoke"))
+                return "50d";
+            
+            // Cloudy (general)
+            else if (description.Contains("cloud"))
+                return "02d";
+            
+            // Default to sunny
+            return "01d";
         }
     }
 }
