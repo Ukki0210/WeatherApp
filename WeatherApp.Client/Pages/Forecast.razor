@@ -404,23 +404,28 @@
         color: #666;
     }
 
-    .summary-badge {
-        margin-left: auto;
-        text-align: right;
-    }
+   .summary-badge {
+    margin-left: auto;
+    text-align: right;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* ✅ Added gradient background */
+    padding: 0.75rem 1.25rem; /* ✅ Added padding */
+    border-radius: 12px; /* ✅ Added border radius */
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); /* ✅ Added shadow */
+}
 
-    .badge-text {
-        display: block;
-        font-size: 0.85rem;
-        color: #999;
-    }
+.badge-text {
+    display: block;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.8); /* ✅ Changed to white with transparency */
+}
 
-    .badge-time {
-        display: block;
-        font-size: 1.2rem;
-        font-weight: bold;
-        color: #667eea;
-    }
+.badge-time {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #ffffff; /* ✅ White text */
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); /* ✅ Shadow for readability */
+}
 
     /* Statistics Summary */
     .stats-summary {
