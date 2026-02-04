@@ -157,8 +157,8 @@
                             </div>
                         </div>
 
-                        <!-- Hourly Forecast Cards - Scrollable -->
-                        <div class="hourly-scroll">
+                        <!-- Hourly Forecast Cards - Grid Layout (No Scrolling) -->
+                        <div class="hourly-container">
                             <div class="hourly-grid">
                                 @foreach (var forecast in dayForecasts)
                                 {
@@ -290,7 +290,6 @@
         max-width: 1400px;
         margin: 0 auto;
         padding: 2rem;
-        overflow-x: hidden;
     }
 
     /* Loading State */
@@ -591,82 +590,41 @@
     }
 
     /* ========================================
-   IMPROVED HORIZONTAL SCROLLING
-   ======================================== */
+       FIXED: GRID LAYOUT WITH ROW WRAPPING
+       NO HORIZONTAL SCROLLING
+       ======================================== */
 
-/* Hourly Scroll Container - GUARANTEED FIX */
-.hourly-scroll {
-    width: 100%;
-    overflow-x: scroll !important; /* ✅ Force scroll to always show */
-    overflow-y: hidden;
-    padding: 1rem 0 2.5rem 0; /* ✅ More padding for scrollbar */
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: auto;
-    scrollbar-color: #667eea #e0e0e0;
-    position: relative; /* ✅ Added */
-}
+    /* Hourly Container - Simple wrapper */
+    .hourly-container {
+        width: 100%;
+        padding: 1rem 0;
+    }
 
-/* Custom Scrollbar for Webkit (Chrome, Safari, Edge) */
-.hourly-scroll::-webkit-scrollbar {
-    height: 18px; /* ✅ Larger for visibility */
-    -webkit-appearance: none; /* ✅ Reset default */
-}
+    /* Hourly Grid - WRAPS INTO ROWS */
+    .hourly-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 1rem;
+        padding: 0;
+    }
 
-.hourly-scroll::-webkit-scrollbar-track {
-    background: #e0e0e0;
-    border-radius: 10px;
-    margin: 0 1rem;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.1); /* ✅ Added depth */
-}
+    /* Forecast Card */
+    .forecast-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        animation: fadeIn 0.5s ease;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
 
-.hourly-scroll::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 10px;
-    border: 3px solid #e0e0e0;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
-    min-width: 50px; /* ✅ Minimum thumb size */
-}
-
-.hourly-scroll::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #5568d3 0%, #6a3d8c 100%);
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.6);
-    cursor: grab;
-}
-
-.hourly-scroll::-webkit-scrollbar-thumb:active {
-    cursor: grabbing;
-}
-
-/* Hourly Grid - CRITICAL FIX */
-.hourly-grid {
-    display: inline-flex; /* ✅ Keep as inline-flex */
-    flex-wrap: nowrap; /* ✅ No wrapping */
-    gap: 1rem;
-    padding: 0 0.5rem;
-    width: max-content; /* ✅ CHANGED from min-width to width */
-}
-
-/* Forecast Card */
-.forecast-card {
-    flex: 0 0 220px;
-    min-width: 220px;
-    max-width: 220px;
-    background: white;
-    border-radius: 15px;
-    padding: 1.5rem;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-    animation: fadeIn 0.5s ease;
-}
-
-.forecast-card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 15px 40px rgba(102, 126, 234, 0.3);
-}
-
-    
+    .forecast-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.3);
+    }
 
     .card-time {
         font-size: 1.2rem;
@@ -728,6 +686,7 @@
         text-transform: capitalize;
         font-size: 0.9rem;
         margin-bottom: 1rem;
+        flex-grow: 1;
     }
 
     .card-metrics {
@@ -848,22 +807,13 @@
         color: #bbb;
     }
 
-    /* Dark Mode Scrollbar */
-    :global(body.dark-mode) .hourly-scroll::-webkit-scrollbar-track {
-        background: linear-gradient(to right, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.3));
-    }
-
-    :global(body.dark-mode) .hourly-scroll::-webkit-scrollbar-thumb {
-        background: linear-gradient(135deg, #7f8ff4 0%, #8b5fc7 100%);
-        border: 3px solid rgba(255, 255, 255, 0.1);
-    }
-
-    :global(body.dark-mode) .hourly-scroll::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(135deg, #9099f7 0%, #9d6fd9 100%);
-        border: 3px solid rgba(255, 255, 255, 0.2);
-    }
-
     /* Mobile Responsive */
+    @@media (max-width: 1200px) {
+        .hourly-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        }
+    }
+
     @@media (max-width: 768px) {
         .forecast-hero {
             padding: 2rem 1rem;
@@ -891,14 +841,13 @@
             grid-template-columns: 1fr;
         }
 
-        .hourly-scroll::-webkit-scrollbar {
-            height: 10px;
+        .hourly-grid {
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.75rem;
         }
 
         .forecast-card {
-            flex: 0 0 200px;
-            min-width: 200px;
-            max-width: 200px;
+            padding: 1.25rem;
         }
     }
 
@@ -907,38 +856,23 @@
             height: 200px;
         }
 
-        .hourly-scroll::-webkit-scrollbar {
-            height: 8px;
+        .hourly-grid {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 0.5rem;
         }
 
         .forecast-card {
-            flex: 0 0 180px;
-            min-width: 180px;
-            max-width: 180px;
             padding: 1rem;
         }
+
+        .card-icon {
+            font-size: 2.5rem;
+        }
+
+        .temp-value {
+            font-size: 1.75rem;
+        }
     }
-    /* ========================================
-   SCROLL INDICATORS & TOUCH HINTS
-   ======================================== */
-
-/* Add subtle shadow to indicate more content */
-.hourly-scroll::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 2rem;
-    width: 40px;
-    background: linear-gradient(to left, rgba(102, 126, 234, 0.1), transparent);
-    pointer-events: none;
-    border-radius: 0 15px 15px 0;
-}
-
-.day-section {
-    position: relative;
-    margin-bottom: 2rem;
-}
 </style>
 
 @code {
